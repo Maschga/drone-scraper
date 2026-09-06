@@ -1,0 +1,15 @@
+[Unit]
+Description=iFlight Nazgul Price Tracker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/Documents/nazgul-price-tracker
+ExecStart=/home/pi/Documents/.local/bin/uv run python main.py
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
