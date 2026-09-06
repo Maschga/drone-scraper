@@ -1,5 +1,8 @@
 SERVICE=nazgul-tracker.service
 
+run:
+	uv run python main.py
+
 install:
 	uv sync
 	sudo cp $(SERVICE) /etc/systemd/system/

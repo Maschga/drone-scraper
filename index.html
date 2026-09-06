@@ -10,9 +10,7 @@
 
     <title>iFlight Nazgul Price Tracker</title>
 
-    <script
-        src="https://cdn.plot.ly/plotly-2.35.2.min.js">
-    </script>
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 
     <style>
         :root {
@@ -78,27 +76,26 @@
             font-size: 13px;
         }
 
-        #chart {
-            height: 520px;
-            background: #191c22;
-            border: 1px solid #292d36;
-            border-radius: 14px;
-            padding: 8px;
-        }
-
         .actions {
             display: flex;
             align-items: center;
             gap: 16px;
+            flex-wrap: wrap;
             margin: 20px 0;
         }
 
         button {
             padding: 10px 18px;
             border-radius: 8px;
-            border: 0;
+            border: 1px solid #292d36;
             cursor: pointer;
             font-weight: 600;
+            background: #20242c;
+            color: #e8e8e8;
+        }
+
+        button:hover {
+            background: #292e38;
         }
 
         button:disabled {
@@ -109,6 +106,42 @@
         #tracker-status {
             color: #989da8;
             font-size: 14px;
+        }
+
+        .range-selector {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+
+        .range-button {
+            padding: 8px 14px;
+            background: #191c22;
+        }
+
+        .range-button.active {
+            background: #e8e8e8;
+            color: #111318;
+        }
+
+        #chart {
+            height: 520px;
+            background: #191c22;
+            border: 1px solid #292d36;
+            border-radius: 14px;
+            padding: 8px;
+        }
+
+        @media (max-width: 600px) {
+            main {
+                width: min(100% - 20px, 1200px);
+                margin: 20px auto;
+            }
+
+            #chart {
+                height: 420px;
+            }
         }
     </style>
 </head>
@@ -126,7 +159,6 @@
     <div class="cards">
 
         <div class="card">
-
             <div class="model">
                 Nazgul DC5 ECO
             </div>
@@ -142,11 +174,9 @@
                 id="eco-variant">
                 Noch keine Daten
             </div>
-
         </div>
 
         <div class="card">
-
             <div class="model">
                 Nazgul Evoque F5 V3 GPS
             </div>
@@ -162,7 +192,6 @@
                 id="normal-variant">
                 Noch keine Daten
             </div>
-
         </div>
 
     </div>
@@ -179,11 +208,43 @@
 
     </div>
 
+    <div class="range-selector">
+
+        <button
+            class="range-button active"
+            data-range="day">
+            Tag
+        </button>
+
+        <button
+            class="range-button"
+            data-range="week">
+            Woche
+        </button>
+
+        <button
+            class="range-button"
+            data-range="month">
+            Monat
+        </button>
+
+        <button
+            class="range-button"
+            data-range="all">
+            Alle
+        </button>
+
+    </div>
+
     <div id="chart"></div>
 
 </main>
 
 <script>
+
+let selectedRange = "day";
+let allRows = [];
+
 
 function latest(rows, key) {
     const matches = rows.filter(
@@ -197,7 +258,10 @@ function latest(rows, key) {
 
 
 function updateCard(rows, key) {
-    const row = latest(rows, key);
+    const row = latest(
+        rows,
+        key
+    );
 
     const price =
         document.getElementById(
@@ -227,57 +291,115 @@ function updateCard(rows, key) {
 }
 
 
-async function updateStatus() {
-    const response =
-        await fetch("/api/status");
-
-    const status =
-        await response.json();
-
-    const element =
-        document.getElementById(
-            "tracker-status"
-        );
-
-    if (!status.last_run) {
-        element.textContent =
-            "Noch kein Abruf durchgeführt.";
-
-        return;
+function filterRowsByRange(rows, range) {
+    if (range === "all") {
+        return rows;
     }
 
-    let text =
-        `Letzter Abruf: ${status.last_run}`;
+    const now = new Date();
 
-    const errors =
-        Object.entries(
-            status.last_errors || {}
-        );
+    const ranges = {
+        day:
+            24 *
+            60 *
+            60 *
+            1000,
 
-    if (errors.length) {
-        text +=
-            " · Fehler: " +
-            errors
-                .map(
-                    ([key, value]) =>
-                        `${key}: ${value}`
-                )
-                .join(" | ");
-    }
+        week:
+            7 *
+            24 *
+            60 *
+            60 *
+            1000,
 
-    element.textContent = text;
+        month:
+            30 *
+            24 *
+            60 *
+            60 *
+            1000,
+    };
+
+    const cutoff = new Date(
+        now.getTime() - ranges[range]
+    );
+
+    return rows.filter(row => {
+        const timestamp =
+            new Date(row.timestamp);
+
+        return timestamp >= cutoff;
+    });
 }
 
 
-async function loadGraph() {
-    const response =
-        await fetch("/api/prices");
+async function updateStatus() {
+    try {
+        const response =
+            await fetch("/api/status");
 
+        if (!response.ok) {
+            throw new Error(
+                `HTTP ${response.status}`
+            );
+        }
+
+        const status =
+            await response.json();
+
+        const element =
+            document.getElementById(
+                "tracker-status"
+            );
+
+        if (!status.last_run) {
+            element.textContent =
+                "Noch kein Abruf durchgeführt.";
+
+            return;
+        }
+
+        const lastRun =
+            new Date(status.last_run);
+
+        let text =
+            `Letzter Abruf: ${
+                lastRun.toLocaleString("de-DE")
+            }`;
+
+        const errors =
+            Object.entries(
+                status.last_errors || {}
+            );
+
+        if (errors.length) {
+            text +=
+                " · Fehler: " +
+                errors
+                    .map(
+                        ([key, value]) =>
+                            `${key}: ${value}`
+                    )
+                    .join(" | ");
+        }
+
+        element.textContent = text;
+
+    } catch (error) {
+        console.error(
+            "Status konnte nicht geladen werden:",
+            error
+        );
+    }
+}
+
+
+function renderGraph() {
     const rows =
-        await response.json();
-
-    updateCard(rows, "eco");
-    updateCard(rows, "normal");
+        filterRowsByRange(
+            allRows,
+            selectedRange
+        );
 
     const config = [
         {
@@ -295,7 +417,8 @@ async function loadGraph() {
 
             const points =
                 rows.filter(
-                    row => row.key === item.key
+                    row =>
+                        row.key === item.key
                 );
 
             return {
@@ -329,46 +452,123 @@ async function loadGraph() {
             };
         });
 
+
+    const rangeNames = {
+        day:
+            "Letzte 24 Stunden",
+
+        week:
+            "Letzte 7 Tage",
+
+        month:
+            "Letzte 30 Tage",
+
+        all:
+            "Gesamter Zeitraum",
+    };
+
+
     Plotly.react(
         "chart",
         traces,
         {
-            paper_bgcolor: "#191c22",
-            plot_bgcolor: "#191c22",
+            paper_bgcolor:
+                "#191c22",
+
+            plot_bgcolor:
+                "#191c22",
 
             font: {
-                color: "#e8e8e8",
+                color:
+                    "#e8e8e8",
+            },
+
+            title: {
+                text:
+                    rangeNames[
+                        selectedRange
+                    ],
+
+                font: {
+                    size: 16,
+                },
             },
 
             margin: {
                 l: 70,
                 r: 30,
-                t: 40,
+                t: 60,
                 b: 70,
             },
 
-            hovermode: "x unified",
+            hovermode:
+                "x unified",
 
             xaxis: {
-                title: "Zeit",
-                gridcolor: "#292d36",
+                title:
+                    "Zeit",
+
+                gridcolor:
+                    "#292d36",
             },
 
             yaxis: {
-                title: "Preis in EUR",
-                gridcolor: "#292d36",
+                title:
+                    "Preis in EUR",
+
+                gridcolor:
+                    "#292d36",
             },
 
             legend: {
-                orientation: "h",
+                orientation:
+                    "h",
             },
         },
         {
             responsive: true,
+            displaylogo: false,
         }
     );
+}
 
-    await updateStatus();
+
+async function loadGraph() {
+    try {
+        const response =
+            await fetch(
+                "/api/prices"
+            );
+
+        if (!response.ok) {
+            throw new Error(
+                `HTTP ${response.status}`
+            );
+        }
+
+        allRows =
+            await response.json();
+
+        updateCard(
+            allRows,
+            "eco"
+        );
+
+        updateCard(
+            allRows,
+            "normal"
+        );
+
+        renderGraph();
+
+        await updateStatus();
+
+    } catch (error) {
+        console.error(
+            "Preisdaten konnten nicht geladen werden:",
+            error
+        );
+    }
 }
 
 
@@ -379,18 +579,32 @@ async function collectNow() {
         );
 
     button.disabled = true;
+
     button.textContent =
         "Abruf läuft …";
 
     try {
-        await fetch(
-            "/api/collect",
-            {
-                method: "POST"
-            }
-        );
+        const response =
+            await fetch(
+                "/api/collect",
+                {
+                    method: "POST"
+                }
+            );
+
+        if (!response.ok) {
+            throw new Error(
+                `HTTP ${response.status}`
+            );
+        }
 
         await loadGraph();
+
+    } catch (error) {
+        console.error(
+            "Preisabruf fehlgeschlagen:",
+            error
+        );
 
     } finally {
         button.disabled = false;
@@ -401,8 +615,45 @@ async function collectNow() {
 }
 
 
+document
+    .querySelectorAll(
+        ".range-button"
+    )
+    .forEach(button => {
+
+        button.addEventListener(
+            "click",
+            () => {
+
+                selectedRange =
+                    button.dataset.range;
+
+                document
+                    .querySelectorAll(
+                        ".range-button"
+                    )
+                    .forEach(item => {
+                        item.classList.remove(
+                            "active"
+                        );
+                    });
+
+                button.classList.add(
+                    "active"
+                );
+
+                renderGraph();
+            }
+        );
+    });
+
+
 loadGraph();
 
+
+// Webseite jede Minute aktualisieren.
+// Der eigentliche automatische Preisabruf
+// findet weiterhin serverseitig jede Stunde statt.
 setInterval(
     loadGraph,
     60_000
