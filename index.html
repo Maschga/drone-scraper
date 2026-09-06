@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>iFlight Nazgul Price Tracker</title>
+
+    <script
+        src="https://cdn.plot.ly/plotly-2.35.2.min.js">
+    </script>
+
+    <style>
+        :root {
+            font-family:
+                Inter,
+                system-ui,
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
+                sans-serif;
+
+            color-scheme: dark;
+        }
+
+        body {
+            margin: 0;
+            background: #111318;
+            color: #e8e8e8;
+        }
+
+        main {
+            width: min(1200px, calc(100% - 32px));
+            margin: 40px auto;
+        }
+
+        h1 {
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: #989da8;
+            margin-bottom: 32px;
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns:
+                repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            border: 1px solid #292d36;
+            border-radius: 14px;
+            padding: 20px;
+            background: #191c22;
+        }
+
+        .model {
+            color: #969ca8;
+            font-size: 14px;
+        }
+
+        .price {
+            font-size: 30px;
+            font-weight: 700;
+            margin: 10px 0;
+        }
+
+        .variant {
+            color: #a7adb8;
+            font-size: 13px;
+        }
+
+        #chart {
+            height: 520px;
+            background: #191c22;
+            border: 1px solid #292d36;
+            border-radius: 14px;
+            padding: 8px;
+        }
+
+        .actions {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin: 20px 0;
+        }
+
+        button {
+            padding: 10px 18px;
+            border-radius: 8px;
+            border: 0;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: wait;
+        }
+
+        #tracker-status {
+            color: #989da8;
+            font-size: 14px;
+        }
+    </style>
+</head>
+
+<body>
+
+<main>
+
+    <h1>iFlight Nazgul Price Tracker</h1>
+
+    <div class="subtitle">
+        Deutschland · ELRS 2.4 GHz · GPS · stündliche Erfassung
+    </div>
+
+    <div class="cards">
+
+        <div class="card">
+
+            <div class="model">
+                Nazgul DC5 ECO
+            </div>
+
+            <div
+                class="price"
+                id="eco-price">
+                –
+            </div>
+
+            <div
+                class="variant"
+                id="eco-variant">
+                Noch keine Daten
+            </div>
+
+        </div>
+
+        <div class="card">
+
+            <div class="model">
+                Nazgul Evoque F5 V3 GPS
+            </div>
+
+            <div
+                class="price"
+                id="normal-price">
+                –
+            </div>
+
+            <div
+                class="variant"
+                id="normal-variant">
+                Noch keine Daten
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="actions">
+
+        <button
+            id="collect-button"
+            onclick="collectNow()">
+            Jetzt Preis abrufen
+        </button>
+
+        <span id="tracker-status"></span>
+
+    </div>
+
+    <div id="chart"></div>
+
+</main>
+
+<script>
+
+function latest(rows, key) {
+    const matches = rows.filter(
+        row => row.key === key
+    );
+
+    return matches.length
+        ? matches[matches.length - 1]
+        : null;
+}
+
+
+function updateCard(rows, key) {
+    const row = latest(rows, key);
+
+    const price =
+        document.getElementById(
+            `${key}-price`
+        );
+
+    const variant =
+        document.getElementById(
+            `${key}-variant`
+        );
+
+    if (!row) {
+        price.textContent = "–";
+        variant.textContent = "Noch keine Daten";
+        return;
+    }
+
+    price.textContent =
+        `${Number(row.price).toFixed(2)} ${row.currency}`;
+
+    variant.textContent =
+        `${row.variant} · ${
+            row.available
+                ? "lieferbar"
+                : "nicht lieferbar"
+        }`;
+}
+
+
+async function updateStatus() {
+    const response =
+        await fetch("/api/status");
+
+    const status =
+        await response.json();
+
+    const element =
+        document.getElementById(
+            "tracker-status"
+        );
+
+    if (!status.last_run) {
+        element.textContent =
+            "Noch kein Abruf durchgeführt.";
+
+        return;
+    }
+
+    let text =
+        `Letzter Abruf: ${status.last_run}`;
+
+    const errors =
+        Object.entries(
+            status.last_errors || {}
+        );
+
+    if (errors.length) {
+        text +=
+            " · Fehler: " +
+            errors
+                .map(
+                    ([key, value]) =>
+                        `${key}: ${value}`
+                )
+                .join(" | ");
+    }
+
+    element.textContent = text;
+}
+
+
+async function loadGraph() {
+    const response =
+        await fetch("/api/prices");
+
+    const rows =
+        await response.json();
+
+    updateCard(rows, "eco");
+    updateCard(rows, "normal");
+
+    const config = [
+        {
+            key: "eco",
+            label: "Nazgul ECO",
+        },
+        {
+            key: "normal",
+            label: "Nazgul Evoque",
+        },
+    ];
+
+    const traces =
+        config.map(item => {
+
+            const points =
+                rows.filter(
+                    row => row.key === item.key
+                );
+
+            return {
+                name: item.label,
+                type: "scatter",
+                mode: "lines+markers",
+
+                x: points.map(
+                    row => row.timestamp
+                ),
+
+                y: points.map(
+                    row => Number(row.price)
+                ),
+
+                customdata: points.map(
+                    row => [
+                        row.variant,
+                        row.currency,
+                        row.available
+                    ]
+                ),
+
+                hovertemplate:
+                    "<b>%{fullData.name}</b><br>" +
+                    "%{x}<br>" +
+                    "%{y:.2f} %{customdata[1]}<br>" +
+                    "%{customdata[0]}<br>" +
+                    "Lieferbar: %{customdata[2]}" +
+                    "<extra></extra>",
+            };
+        });
+
+    Plotly.react(
+        "chart",
+        traces,
+        {
+            paper_bgcolor: "#191c22",
+            plot_bgcolor: "#191c22",
+
+            font: {
+                color: "#e8e8e8",
+            },
+
+            margin: {
+                l: 70,
+                r: 30,
+                t: 40,
+                b: 70,
+            },
+
+            hovermode: "x unified",
+
+            xaxis: {
+                title: "Zeit",
+                gridcolor: "#292d36",
+            },
+
+            yaxis: {
+                title: "Preis in EUR",
+                gridcolor: "#292d36",
+            },
+
+            legend: {
+                orientation: "h",
+            },
+        },
+        {
+            responsive: true,
+        }
+    );
+
+    await updateStatus();
+}
+
+
+async function collectNow() {
+    const button =
+        document.getElementById(
+            "collect-button"
+        );
+
+    button.disabled = true;
+    button.textContent =
+        "Abruf läuft …";
+
+    try {
+        await fetch(
+            "/api/collect",
+            {
+                method: "POST"
+            }
+        );
+
+        await loadGraph();
+
+    } finally {
+        button.disabled = false;
+
+        button.textContent =
+            "Jetzt Preis abrufen";
+    }
+}
+
+
+loadGraph();
+
+setInterval(
+    loadGraph,
+    60_000
+);
+
+</script>
+
+</body>
+</html>
