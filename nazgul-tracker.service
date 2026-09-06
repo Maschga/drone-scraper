@@ -6,7 +6,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=pi
-WorkingDirectory=/home/pi/Documents/nazgul-price-tracker
+WorkingDirectory=/home/pi/Documents/iflight-nazgul-scraper
 ExecStart=/home/pi/.local/bin/uv run python main.py
 Restart=on-failure
 RestartSec=10
