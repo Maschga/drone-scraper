@@ -5,13 +5,14 @@ import csv
 import re
 from contextlib import asynccontextmanager
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import httpx
 import uvicorn
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from bs4 import BeautifulSoup
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 
@@ -21,33 +22,68 @@ from fastapi.responses import FileResponse
 # ---------------------------------------------------------------------------
 
 BASE_DIR = Path(__file__).resolve().parent
-
 INDEX_FILE = BASE_DIR / "index.html"
 DATA_FILE = BASE_DIR / "data" / "prices.csv"
 
-STORE_URL = "https://iflight-rc.eu"
-
 TIMEZONE = ZoneInfo("Europe/Berlin")
+
+IFLIGHT_STORE_URL = "https://iflight-rc.eu"
 
 
 PRODUCTS = [
     {
-        "key": "eco",
-        "name": "Nazgul DC5 O4 ECO V1.1 6S HD",
+        "key": "iflight-nazgul-dc5",
+        "name": "iFlight Nazgul DC5 O4 ECO V1.1 6S HD",
+        "short_name": "Nazgul DC5 ECO",
+        "shop": "iFlight Europe",
+        "source": "iflight_shopify",
         "handle": "nazgul-dc5-o4-eco-v1-1-6s-hd",
         "variant_terms": [
             "elrs",
             "2.4",
         ],
+        # Sonderfall nur für iFlight Nazgul:
+        "new_account_discount_percent": 5,
     },
     {
-        "key": "normal",
-        "name": "Nazgul Evoque F5 V3 O4 GPS",
+        "key": "iflight-nazgul-evoque",
+        "name": "iFlight Nazgul Evoque F5 V3 O4 GPS",
+        "short_name": "Nazgul Evoque F5 V3",
+        "shop": "iFlight Europe",
+        "source": "iflight_shopify",
         "handle": "nazgul-evoque-f5-v3-o4-gps",
         "variant_terms": [
             "elrs",
             "2.4",
         ],
+        # Sonderfall nur für iFlight Nazgul:
+        "new_account_discount_percent": 5,
+    },
+    {
+        "key": "geprc-vapor-d6",
+        "name": "GEPRC Vapor-D6 HD DJI O4 Pro FPV Drohne ELRS 2.4G",
+        "short_name": "GEPRC Vapor-D6",
+        "shop": "FPV24",
+        "source": "fpv24_html",
+        "url": (
+            "https://www.fpv24.com/de/geprc/"
+            "geprc-vapor-d6-hd-dji-o4-pro-fpv-drohne-elrs-24g"
+        ),
+        "variant": "ELRS 2.4G",
+        "new_account_discount_percent": 0,
+    },
+    {
+        "key": "geprc-vapor-d5",
+        "name": "GEPRC Vapor-D5 HD DJI O4 Pro FPV Drohne ELRS 2.4G",
+        "short_name": "GEPRC Vapor-D5",
+        "shop": "FPV24",
+        "source": "fpv24_html",
+        "url": (
+            "https://www.fpv24.com/de/geprc/"
+            "geprc-vapor-d5-hd-dji-o4-pro-fpv-drohne-elrs-24g"
+        ),
+        "variant": "ELRS 2.4G",
+        "new_account_discount_percent": 0,
     },
 ]
 
@@ -64,13 +100,19 @@ CSV_FIELDS = [
 ]
 
 
+# Die bisherigen Daten aus prices.csv bleiben kompatibel.
+LEGACY_KEY_MAP = {
+    "eco": "iflight-nazgul-dc5",
+    "normal": "iflight-nazgul-evoque",
+}
+
+
 # ---------------------------------------------------------------------------
 # Locks / Status
 # ---------------------------------------------------------------------------
 
 scrape_lock = asyncio.Lock()
 file_lock = asyncio.Lock()
-
 
 state = {
     "last_run": None,
@@ -84,9 +126,6 @@ state = {
 # ---------------------------------------------------------------------------
 
 def normalize(text: str) -> str:
-    """
-    Text vereinheitlichen, damit Varianten einfacher verglichen werden können.
-    """
     return re.sub(
         r"\s+",
         " ",
@@ -96,11 +135,7 @@ def normalize(text: str) -> str:
 
 def shopify_price(raw_price) -> Decimal:
     """
-    Shopify liefert Preise über /products/...js üblicherweise
-    in der kleinsten Währungseinheit.
-
-    Beispiel:
-        49999 -> 499.99 EUR
+    Shopify liefert /products/...js-Preise normalerweise in Cent.
     """
 
     if isinstance(raw_price, int):
@@ -119,15 +154,105 @@ def shopify_price(raw_price) -> Decimal:
     )
 
 
+def parse_euro_price(
+    raw_value: str,
+) -> Decimal | None:
+    """
+    Erkennt Preise wie:
+
+    539,90 €
+    539,90 â‚¬
+    539.90 EUR
+    1.234,56 €
+    1,234.56
+
+    Zusätzlich werden unplausibel kleine/große Werte verworfen.
+    Das verhindert z.B., dass aus dem Lieferdatum 02.10.26
+    versehentlich 2,10 € wird.
+    """
+
+    text = (
+        str(raw_value)
+        .replace("\xa0", " ")
+        .replace("EUR", " ")
+        .replace("eur", " ")
+        .replace("€", " ")
+        .replace("â‚¬", " ")
+        .strip()
+    )
+
+    matches = re.findall(
+        r"(?<!\d)"
+        r"(\d{1,4}(?:[.\s]\d{3})*[,.]\d{2})"
+        r"(?!\d)",
+        text,
+    )
+
+    for token in matches:
+        token = token.replace(
+            " ",
+            "",
+        )
+
+        # Sowohl Punkt als auch Komma vorhanden:
+        # Das zuletzt vorkommende Zeichen ist
+        # der Dezimaltrenner.
+        if (
+            "," in token
+            and "." in token
+        ):
+            if (
+                token.rfind(",")
+                >
+                token.rfind(".")
+            ):
+                # 1.234,56
+                token = (
+                    token
+                    .replace(".", "")
+                    .replace(",", ".")
+                )
+            else:
+                # 1,234.56
+                token = (
+                    token
+                    .replace(",", "")
+                )
+
+        elif "," in token:
+            token = token.replace(
+                ",",
+                ".",
+            )
+
+        try:
+            value = Decimal(token)
+        except InvalidOperation:
+            continue
+
+        # Für komplette FPV-Drohnen sinnvolle Grenzen.
+        # Gleichzeitig werden Datumswerte wie 02.10
+        # zuverlässig ignoriert.
+        if (
+            Decimal("50")
+            <= value
+            <= Decimal("5000")
+        ):
+            return value
+
+    return None
+
+
+# ---------------------------------------------------------------------------
+# iFlight / Shopify
+# ---------------------------------------------------------------------------
+
 def choose_variant(
     product: dict,
     required_terms: list[str],
 ) -> dict:
     """
-    Sucht die passende ELRS-2.4-GHz-Variante.
-
-    Da die aktuell angebotenen Varianten laut Shop bereits GPS enthalten,
-    wird GPS nicht zusätzlich über den Variantennamen gefiltert.
+    Sucht bei iFlight die gewünschte ELRS-2.4-GHz-Variante.
     """
 
     variants = product.get(
@@ -151,9 +276,7 @@ def choose_variant(
             term.lower() in title
             for term in required_terms
         ):
-            matching.append(
-                variant
-            )
+            matching.append(variant)
 
     if not matching:
         available_titles = [
@@ -167,13 +290,13 @@ def choose_variant(
         ]
 
         raise RuntimeError(
-            "Keine passende ELRS-2.4-GHz-Variante gefunden. "
+            "Keine passende Variante gefunden. "
             f"Gesucht: {required_terms}. "
             f"Vorhandene Varianten: {available_titles}"
         )
 
     # Wenn mehrere Varianten passen:
-    # zuerst eine aktuell verfügbare auswählen.
+    # zuerst eine lieferbare nehmen.
     for variant in matching:
         if variant.get(
             "available",
@@ -181,26 +304,20 @@ def choose_variant(
         ):
             return variant
 
-    # Falls momentan nichts lieferbar ist,
-    # trotzdem den Preis der Variante speichern.
+    # Preis trotzdem erfassen,
+    # auch wenn die Drohne gerade ausverkauft ist.
     return matching[0]
 
 
-# ---------------------------------------------------------------------------
-# Shopify
-# ---------------------------------------------------------------------------
-
-async def set_german_store_context(
+async def set_iflight_german_context(
     client: httpx.AsyncClient,
 ) -> None:
     """
-    Versucht Shopify explizit auf Deutschland zu setzen.
-
-    Der Cookie bleibt anschließend im httpx-Client erhalten.
+    Shopify explizit auf Deutschland setzen.
     """
 
     response = await client.post(
-        f"{STORE_URL}/localization",
+        f"{IFLIGHT_STORE_URL}/localization",
         data={
             "form_type": "localization",
             "utf8": "✓",
@@ -213,15 +330,11 @@ async def set_german_store_context(
     response.raise_for_status()
 
 
-async def get_currency(
+async def get_iflight_currency(
     client: httpx.AsyncClient,
 ) -> str:
-    """
-    Liest die aktuell vom Shop verwendete Währung aus dem Shopify-Warenkorb.
-    """
-
     response = await client.get(
-        f"{STORE_URL}/cart.js"
+        f"{IFLIGHT_STORE_URL}/cart.js"
     )
 
     response.raise_for_status()
@@ -234,24 +347,17 @@ async def get_currency(
     )
 
 
-async def fetch_product(
+async def fetch_iflight_product(
     client: httpx.AsyncClient,
     config: dict,
     currency: str,
 ) -> dict:
-    """
-    Holt die Shopify-Produktdaten und sucht die gewünschte Variante.
-    """
-
     api_url = (
-        f"{STORE_URL}/products/"
+        f"{IFLIGHT_STORE_URL}/products/"
         f"{config['handle']}.js"
     )
 
-    response = await client.get(
-        api_url
-    )
-
+    response = await client.get(api_url)
     response.raise_for_status()
 
     product = response.json()
@@ -266,7 +372,7 @@ async def fetch_product(
     )
 
     product_url = (
-        f"{STORE_URL}/products/"
+        f"{IFLIGHT_STORE_URL}/products/"
         f"{config['handle']}"
     )
 
@@ -277,6 +383,9 @@ async def fetch_product(
             "title",
             "",
         ),
+        # Wichtig:
+        # Hier wird der REGULÄRE Preis gespeichert.
+        # Der 5-%-Rabatt wird nicht in die CSV eingebrannt.
         "price": f"{price:.2f}",
         "currency": currency,
         "available": bool(
@@ -290,16 +399,349 @@ async def fetch_product(
 
 
 # ---------------------------------------------------------------------------
+# FPV24
+# ---------------------------------------------------------------------------
+
+def extract_fpv24_price(
+    soup: BeautifulSoup,
+    config: dict,
+) -> Decimal:
+    """
+    Liest den Hauptpreis einer FPV24-Produktseite.
+
+    FPV24 ist hier etwas speziell:
+    Der Preis ist zwar im HTML sichtbar, sitzt aber nicht
+    zuverlässig in klassischen schema.org-/Shopware-
+    Preisfeldern.
+
+    Deshalb suchen wir zuerst direkt NACH dem Produkt-H1.
+    Dort kommt auf FPV24 aktuell:
+
+        Produktname
+        Lieferstatus
+        Hauptpreis
+        PayPal
+        ...
+
+    Das ist deutlich sicherer als global auf der Seite
+    nach dem ersten EUR-Betrag zu suchen, weil weiter unten
+    Zubehörpreise und der Warenkorb auftauchen.
+    """
+
+    heading = soup.find("h1")
+
+    if heading is not None:
+        # Nur die ersten Textknoten NACH der Produktüberschrift
+        # untersuchen.
+        #
+        # Wichtig:
+        # Wir verlangen absichtlich KEIN "€" im String.
+        # Je nach Encoding kann aus € z.B. "â‚¬" werden.
+        for node in heading.find_all_next(
+            string=True,
+            limit=120,
+        ):
+            text = " ".join(
+                str(node).split()
+            )
+
+            if not text:
+                continue
+
+            price = parse_euro_price(
+                text
+            )
+
+            if price is not None:
+                return price
+
+    # -----------------------------------------------------------------------
+    # Fallback 1:
+    # Bekannte Preisfelder ausprobieren.
+    # -----------------------------------------------------------------------
+
+    selectors = [
+        'meta[itemprop="price"]',
+        'meta[property="product:price:amount"]',
+        '[itemprop="price"]',
+        '[data-price]',
+        ".product--price",
+        ".price--content",
+        ".product-price",
+        ".article-price",
+        ".product-detail-price",
+    ]
+
+    for selector in selectors:
+        for node in soup.select(
+            selector
+        ):
+            values = [
+                node.get("content"),
+                node.get("data-price"),
+                node.get_text(
+                    " ",
+                    strip=True,
+                ),
+            ]
+
+            for raw_value in values:
+                if not raw_value:
+                    continue
+
+                price = parse_euro_price(
+                    raw_value
+                )
+
+                if price is not None:
+                    return price
+
+    # -----------------------------------------------------------------------
+    # Fallback 2:
+    # Ein begrenztes Textfenster rund um den Produktnamen verwenden.
+    # -----------------------------------------------------------------------
+
+    page_text = soup.get_text(
+        " ",
+        strip=True,
+    )
+
+    product_names = [
+        config.get(
+            "name",
+            "",
+        ),
+        config.get(
+            "short_name",
+            "",
+        ),
+    ]
+
+    for product_name in product_names:
+        if not product_name:
+            continue
+
+        position = (
+            page_text
+            .lower()
+            .find(
+                product_name.lower()
+            )
+        )
+
+        if position == -1:
+            continue
+
+        # Nur ein relativ kleines Fenster ab Produktname.
+        # So kommen Zubehörpreise weiter unten nicht zum Zug.
+        window = page_text[
+            position:
+            position + 2500
+        ]
+
+        # Text in kleinere Bestandteile teilen,
+        # damit immer der erste plausible Preis gewinnt.
+        chunks = re.split(
+            r"[\n|]",
+            window,
+        )
+
+        for chunk in chunks:
+            price = parse_euro_price(
+                chunk
+            )
+
+            if price is not None:
+                return price
+
+        # Falls der Shop alles in eine Zeile rendert.
+        price = parse_euro_price(
+            window
+        )
+
+        if price is not None:
+            return price
+
+    heading_text = (
+        heading.get_text(
+            " ",
+            strip=True,
+        )
+        if heading
+        else "kein H1 gefunden"
+    )
+
+    raise RuntimeError(
+        "FPV24-Preis konnte nicht erkannt werden. "
+        f"H1={heading_text!r}, "
+        f"HTML-Laenge={len(str(soup))}"
+    )
+
+
+def extract_fpv24_availability(
+    soup: BeautifulSoup,
+    config: dict,
+) -> bool:
+    """
+    Ermittelt die Lieferbarkeit möglichst nah
+    am eigentlichen Produktbereich.
+    """
+
+    heading = soup.find("h1")
+
+    if heading is not None:
+        local_parts = []
+
+        for node in heading.find_all_next(
+            string=True,
+            limit=100,
+        ):
+            text = " ".join(
+                str(node).split()
+            )
+
+            if text:
+                local_parts.append(
+                    text
+                )
+
+        local_text = normalize(
+            " ".join(
+                local_parts
+            )
+        )
+
+    else:
+        local_text = normalize(
+            soup.get_text(
+                " ",
+                strip=True,
+            )[:5000]
+        )
+
+    # Nicht verfügbar zuerst prüfen.
+    #
+    # Die beiden Vapor-Produkte enthalten aktuell:
+    #
+    # "Vorraussichtlich ab 02.10.26 wieder lieferbar
+    #  - jetzt vorbestellen!"
+    #
+    # sowie "Vorbestellung".
+    unavailable_markers = [
+        "vorbestellung",
+        "vorbestellen",
+        "wieder lieferbar",
+        "nicht lieferbar",
+        "nicht verfügbar",
+        "nicht verfuegbar",
+        "ausverkauft",
+        "benachrichtigen",
+        "sobald das produkt wieder verfügbar ist",
+        "sobald das produkt wieder verfuegbar ist",
+    ]
+
+    if any(
+        marker in local_text
+        for marker in unavailable_markers
+    ):
+        return False
+
+    available_markers = [
+        "sofort lieferbar",
+        "auf lager",
+        "lagernd",
+        "sofort versandfertig",
+        "in den warenkorb",
+    ]
+
+    if any(
+        marker in local_text
+        for marker in available_markers
+    ):
+        return True
+
+    # Bei unbekanntem Zustand lieber nicht fälschlich
+    # "lieferbar" anzeigen.
+    return False
+
+
+async def fetch_fpv24_product(
+    client: httpx.AsyncClient,
+    config: dict,
+) -> dict:
+    response = await client.get(
+        config["url"],
+        headers={
+            "Referer": (
+                "https://www.fpv24.com/"
+            ),
+            "Accept": (
+                "text/html,"
+                "application/xhtml+xml,"
+                "application/xml;q=0.9,"
+                "*/*;q=0.8"
+            ),
+            "Accept-Language": (
+                "de-DE,de;q=0.9,"
+                "en;q=0.7"
+            ),
+        },
+    )
+
+    response.raise_for_status()
+
+    soup = BeautifulSoup(
+        response.text,
+        "html.parser",
+    )
+
+    try:
+        price = extract_fpv24_price(
+            soup,
+            config,
+        )
+    except Exception as exc:
+        page_title = (
+            soup.title.get_text(
+                " ",
+                strip=True,
+            )
+            if soup.title
+            else "kein title"
+        )
+
+        raise RuntimeError(
+            f"{exc} "
+            f"HTTP={response.status_code}, "
+            f"Bytes={len(response.content)}, "
+            f"Title={page_title!r}"
+        ) from exc
+
+    available = (
+        extract_fpv24_availability(
+            soup,
+            config,
+        )
+    )
+
+    return {
+        "key": config["key"],
+        "name": config["name"],
+        "variant": config["variant"],
+        "price": f"{price:.2f}",
+        "currency": "EUR",
+        "available": available,
+        "url": config["url"],
+    }
+
+
+# ---------------------------------------------------------------------------
 # CSV
 # ---------------------------------------------------------------------------
 
 def append_csv_rows(
     rows: list[dict],
 ) -> None:
-    """
-    Hängt neue Messwerte an data/prices.csv an.
-    """
-
     DATA_FILE.parent.mkdir(
         parents=True,
         exist_ok=True,
@@ -312,7 +754,6 @@ def append_csv_rows(
         newline="",
         encoding="utf-8",
     ) as file:
-
         writer = csv.DictWriter(
             file,
             fieldnames=CSV_FIELDS,
@@ -321,14 +762,15 @@ def append_csv_rows(
         if new_file:
             writer.writeheader()
 
-        writer.writerows(
-            rows
-        )
+        writer.writerows(rows)
 
 
 def read_csv_rows() -> list[dict]:
     """
-    Liest alle bisher gespeicherten Preiswerte.
+    Vorhandene Preis-Historie lesen.
+
+    Die alten Keys "eco" und "normal" werden beim Lesen
+    automatisch auf die neuen Namen gemappt.
     """
 
     if not DATA_FILE.exists():
@@ -341,10 +783,7 @@ def read_csv_rows() -> list[dict]:
         newline="",
         encoding="utf-8",
     ) as file:
-
-        reader = csv.DictReader(
-            file
-        )
+        reader = csv.DictReader(file)
 
         for row in reader:
             try:
@@ -357,6 +796,18 @@ def read_csv_rows() -> list[dict]:
             ):
                 continue
 
+            old_key = row.get(
+                "key",
+                "",
+            )
+
+            row["key"] = (
+                LEGACY_KEY_MAP.get(
+                    old_key,
+                    old_key,
+                )
+            )
+
             row["available"] = (
                 str(
                     row.get(
@@ -367,9 +818,7 @@ def read_csv_rows() -> list[dict]:
                 == "true"
             )
 
-            rows.append(
-                row
-            )
+            rows.append(row)
 
     return rows
 
@@ -380,13 +829,13 @@ def read_csv_rows() -> list[dict]:
 
 async def collect_prices() -> dict:
     """
-    Ruft beide Preise ab und schreibt sie in die CSV-Datei.
+    Ruft alle konfigurierten Produkte ab.
 
-    Durch scrape_lock können nicht zwei Abrufe gleichzeitig laufen.
+    Der reguläre Shoppreis wird gespeichert.
+    Rabattberechnungen erfolgen später in der Weboberfläche.
     """
 
     async with scrape_lock:
-
         timestamp = datetime.now(
             TIMEZONE
         ).isoformat(
@@ -426,57 +875,75 @@ async def collect_prices() -> dict:
             timeout=timeout,
             follow_redirects=True,
         ) as client:
+            # ---------------------------------------------------------------
+            # iFlight vorbereiten
+            # ---------------------------------------------------------------
 
-            # ---------------------------------------------------------------
-            # Deutschland / EUR setzen
-            # ---------------------------------------------------------------
+            iflight_currency = "EUR"
 
             try:
-                await set_german_store_context(
+                await set_iflight_german_context(
                     client
                 )
-
             except Exception as exc:
-                # Nicht sofort abbrechen.
-                # Der Shop könnte trotzdem bereits EUR verwenden.
                 print(
                     "[WARNUNG] "
-                    "Shopify-Lokalisierung konnte "
+                    "iFlight-Lokalisierung konnte "
                     f"nicht gesetzt werden: {exc}"
                 )
 
-            # ---------------------------------------------------------------
-            # Währung bestimmen
-            # ---------------------------------------------------------------
-
             try:
-                currency = await get_currency(
-                    client
+                iflight_currency = (
+                    await get_iflight_currency(
+                        client
+                    )
                 )
-
             except Exception as exc:
                 print(
                     "[WARNUNG] "
-                    "Währung konnte nicht gelesen werden. "
-                    f"Nutze EUR. Fehler: {exc}"
+                    "iFlight-Währung konnte "
+                    "nicht bestimmt werden: "
+                    f"{exc}. Nutze EUR."
                 )
 
-                currency = "EUR"
-
             # ---------------------------------------------------------------
-            # Produkte abrufen
+            # Alle Produkte abrufen
             # ---------------------------------------------------------------
 
             for config in PRODUCTS:
-
                 try:
-                    result = await fetch_product(
-                        client,
-                        config,
-                        currency,
-                    )
+                    if (
+                        config["source"]
+                        == "iflight_shopify"
+                    ):
+                        result = (
+                            await fetch_iflight_product(
+                                client,
+                                config,
+                                iflight_currency,
+                            )
+                        )
 
-                    result["timestamp"] = timestamp
+                    elif (
+                        config["source"]
+                        == "fpv24_html"
+                    ):
+                        result = (
+                            await fetch_fpv24_product(
+                                client,
+                                config,
+                            )
+                        )
+
+                    else:
+                        raise RuntimeError(
+                            "Unbekannte Quelle: "
+                            f"{config['source']}"
+                        )
+
+                    result["timestamp"] = (
+                        timestamp
+                    )
 
                     collected.append(
                         result
@@ -496,17 +963,16 @@ async def collect_prices() -> dict:
                     ] = str(exc)
 
                     print(
-                        f"[FEHLER] "
+                        "[FEHLER] "
                         f"{config['name']}: "
                         f"{exc}"
                     )
 
         # -------------------------------------------------------------------
-        # Ergebnisse speichern
+        # Speichern
         # -------------------------------------------------------------------
 
         if collected:
-
             async with file_lock:
                 append_csv_rows(
                     collected
@@ -539,15 +1005,11 @@ scheduler = AsyncIOScheduler(
 async def lifespan(
     app: FastAPI,
 ):
-    """
-    Wird beim Starten/Beenden der FastAPI-Anwendung ausgeführt.
-    """
-
     scheduler.add_job(
         collect_prices,
         trigger="interval",
         hours=1,
-        id="nazgul-hourly",
+        id="drone-scraper-hourly",
         replace_existing=True,
         coalesce=True,
         max_instances=1,
@@ -556,14 +1018,13 @@ async def lifespan(
     scheduler.start()
 
     print(
-        "Starte Nazgul Price Tracker..."
+        "Starte drone-scraper..."
     )
 
     print(
         "Erster Preisabruf..."
     )
 
-    # Beim Start sofort einmal abrufen.
     await collect_prices()
 
     yield
@@ -578,8 +1039,8 @@ async def lifespan(
 # ---------------------------------------------------------------------------
 
 app = FastAPI(
-    title="iFlight Nazgul Price Tracker",
-    version="1.0.0",
+    title="drone-scraper",
+    version="0.2.0",
     lifespan=lifespan,
 )
 
@@ -589,10 +1050,6 @@ app = FastAPI(
     include_in_schema=False,
 )
 async def index():
-    """
-    Liefert die externe index.html aus.
-    """
-
     if not INDEX_FILE.exists():
         return {
             "error": (
@@ -610,24 +1067,14 @@ async def index():
     "/api/prices"
 )
 async def api_prices():
-    """
-    Liefert alle historischen Preise als JSON.
-    """
-
     async with file_lock:
-        rows = read_csv_rows()
-
-    return rows
+        return read_csv_rows()
 
 
 @app.get(
     "/api/status"
 )
 async def api_status():
-    """
-    Statusinformationen für die Weboberfläche.
-    """
-
     return {
         "last_run": state[
             "last_run"
@@ -646,6 +1093,26 @@ async def api_status():
                 "name": product[
                     "name"
                 ],
+                "short_name": product[
+                    "short_name"
+                ],
+                "shop": product[
+                    "shop"
+                ],
+                "url": (
+                    product["url"]
+                    if "url" in product
+                    else (
+                        f"{IFLIGHT_STORE_URL}/products/"
+                        f"{product['handle']}"
+                    )
+                ),
+                "new_account_discount_percent": (
+                    product.get(
+                        "new_account_discount_percent",
+                        0,
+                    )
+                ),
             }
             for product in PRODUCTS
         ],
@@ -656,12 +1123,6 @@ async def api_status():
     "/api/collect"
 )
 async def api_collect():
-    """
-    Löst einen zusätzlichen manuellen Preisabruf aus.
-
-    Wird vom Button in index.html verwendet.
-    """
-
     return await collect_prices()
 
 

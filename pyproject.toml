@@ -1,10 +1,12 @@
 [project]
-name = "nazgul-price-tracker"
-version = "0.1.0"
-description = "Hourly iFlight Nazgul price tracker"
+name = "drone-scraper"
+version = "0.2.0"
+description = "Hourly FPV drone price tracker for iFlight and FPV24"
 requires-python = ">=3.12"
+
 dependencies = [
     "apscheduler>=3.11,<4",
+    "beautifulsoup4>=4.13,<5",
     "fastapi>=0.116,<1",
     "httpx>=0.28,<1",
     "tzdata>=2025.2",

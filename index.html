@@ -1,665 +1,1911 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-    <meta charset="UTF-8">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
+  <meta
+    name="description"
+    content="drone-scraper – Preisverlauf für iFlight Nazgul und GEPRC Vapor FPV-Drohnen."
+  >
 
-    <title>iFlight Nazgul Price Tracker</title>
+  <title>drone-scraper</title>
 
-    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 
-    <style>
-        :root {
-            font-family:
-                Inter,
-                system-ui,
-                -apple-system,
-                BlinkMacSystemFont,
-                "Segoe UI",
-                sans-serif;
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family:
+        Inter,
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
 
-            color-scheme: dark;
-        }
+      --bg: #090b10;
+      --panel: #11151d;
+      --panel-soft: #151a24;
+      --border: #252c39;
+      --border-strong: #343d4d;
+      --text: #f4f6fa;
+      --muted: #9da7b8;
+      --muted-2: #737e90;
+      --accent: #8df0c4;
+      --accent-dark: #163f33;
+      --danger: #ff8d8d;
+      --warning: #ffd98d;
+      --shadow: 0 22px 70px rgba(0, 0, 0, 0.28);
+    }
 
-        body {
-            margin: 0;
-            background: #111318;
-            color: #e8e8e8;
-        }
+    * {
+      box-sizing: border-box;
+    }
 
-        main {
-            width: min(1200px, calc(100% - 32px));
-            margin: 40px auto;
-        }
+    html {
+      background: var(--bg);
+    }
 
-        h1 {
-            margin-bottom: 8px;
-        }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        radial-gradient(
+          circle at 10% -10%,
+          rgba(95, 210, 168, 0.10),
+          transparent 34rem
+        ),
+        radial-gradient(
+          circle at 95% 0%,
+          rgba(102, 126, 234, 0.10),
+          transparent 32rem
+        ),
+        var(--bg);
+    }
 
-        .subtitle {
-            color: #989da8;
-            margin-bottom: 32px;
-        }
+    a {
+      color: inherit;
+    }
 
-        .cards {
-            display: grid;
-            grid-template-columns:
-                repeat(auto-fit, minmax(250px, 1fr));
-            gap: 16px;
-            margin-bottom: 20px;
-        }
+    button,
+    input {
+      font: inherit;
+    }
 
-        .card {
-            border: 1px solid #292d36;
-            border-radius: 14px;
-            padding: 20px;
-            background: #191c22;
-        }
+    button {
+      border: 0;
+    }
 
-        .model {
-            color: #969ca8;
-            font-size: 14px;
-        }
+    .shell {
+      width: min(
+        1320px,
+        calc(100% - 32px)
+      );
+      margin: 0 auto;
+      padding: 40px 0 56px;
+    }
 
-        .price {
-            font-size: 30px;
-            font-weight: 700;
-            margin: 10px 0;
-        }
+    .hero {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 28px;
+    }
 
-        .variant {
-            color: #a7adb8;
-            font-size: 13px;
-        }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
 
-        .actions {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            flex-wrap: wrap;
-            margin: 20px 0;
-        }
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow:
+        0 0 0 6px
+        rgba(141, 240, 196, 0.08);
+    }
 
-        button {
-            padding: 10px 18px;
-            border-radius: 8px;
-            border: 1px solid #292d36;
-            cursor: pointer;
-            font-weight: 600;
-            background: #20242c;
-            color: #e8e8e8;
-        }
+    h1 {
+      margin: 0;
+      font-size:
+        clamp(36px, 6vw, 72px);
+      line-height: 0.95;
+      letter-spacing: -0.055em;
+    }
 
-        button:hover {
-            background: #292e38;
-        }
+    .subtitle {
+      max-width: 760px;
+      margin: 16px 0 0;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.6;
+    }
 
-        button:disabled {
-            opacity: 0.5;
-            cursor: wait;
-        }
+    .hero-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
 
-        #tracker-status {
-            color: #989da8;
-            font-size: 14px;
-        }
+    .button {
+      display: inline-flex;
+      min-height: 44px;
+      align-items: center;
+      justify-content: center;
+      padding: 0 16px;
+      border: 1px solid
+        var(--border-strong);
+      border-radius: 12px;
+      color: var(--text);
+      background: var(--panel-soft);
+      cursor: pointer;
+      font-weight: 750;
+      transition:
+        transform 120ms ease,
+        border-color 120ms ease,
+        background 120ms ease;
+    }
 
-        .range-selector {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            margin-bottom: 12px;
-        }
+    .button:hover:not(:disabled) {
+      transform:
+        translateY(-1px);
+      border-color: #536074;
+      background: #1a202b;
+    }
 
-        .range-button {
-            padding: 8px 14px;
-            background: #191c22;
-        }
+    .button:disabled {
+      opacity: 0.55;
+      cursor: wait;
+    }
 
-        .range-button.active {
-            background: #e8e8e8;
-            color: #111318;
-        }
+    .button-primary {
+      border-color:
+        rgba(141, 240, 196, 0.26);
+      color: #eafff7;
+      background: var(--accent-dark);
+    }
 
-        #chart {
-            height: 520px;
-            background: #191c22;
-            border: 1px solid #292d36;
-            border-radius: 14px;
-            padding: 8px;
-        }
+    .overview-grid {
+      display: grid;
+      grid-template-columns:
+        repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
 
-        @media (max-width: 600px) {
-            main {
-                width: min(100% - 20px, 1200px);
-                margin: 20px auto;
-            }
+    .stat {
+      min-height: 112px;
+      padding: 18px;
+      border: 1px solid
+        var(--border);
+      border-radius: 16px;
+      background:
+        rgba(17, 21, 29, 0.82);
+      box-shadow: var(--shadow);
+      backdrop-filter:
+        blur(12px);
+    }
 
-            #chart {
-                height: 420px;
-            }
-        }
-    </style>
+    .stat-label {
+      color: var(--muted-2);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .stat-value {
+      margin-top: 10px;
+      font-size:
+        clamp(22px, 3vw, 32px);
+      font-weight: 850;
+      letter-spacing: -0.04em;
+    }
+
+    .stat-detail {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .section {
+      margin-top: 26px;
+    }
+
+    .section-heading {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+
+    .section-heading h2 {
+      margin: 0;
+      font-size: 20px;
+      letter-spacing: -0.025em;
+    }
+
+    .section-heading p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .product-grid {
+      display: grid;
+      grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .product-card {
+      position: relative;
+      overflow: hidden;
+      padding: 20px;
+      border: 1px solid
+        var(--border);
+      border-radius: 18px;
+      background:
+        linear-gradient(
+          145deg,
+          rgba(255, 255, 255, 0.025),
+          transparent 42%
+        ),
+        var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .product-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .shop {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 28px;
+      padding: 0 9px;
+      border: 1px solid
+        var(--border);
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .badge::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .badge.available {
+      color: var(--accent);
+      border-color:
+        rgba(141, 240, 196, 0.25);
+      background:
+        rgba(22, 63, 51, 0.65);
+    }
+
+    .badge.unavailable {
+      color: var(--warning);
+      border-color:
+        rgba(255, 217, 141, 0.20);
+      background:
+        rgba(58, 47, 23, 0.58);
+    }
+
+    .product-name {
+      min-height: 2.5em;
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.25;
+      letter-spacing: -0.02em;
+    }
+
+    .price-wrap {
+      margin: 18px 0 14px;
+    }
+
+    .price {
+      font-size:
+        clamp(32px, 5vw, 48px);
+      font-weight: 900;
+      letter-spacing: -0.055em;
+      line-height: 1;
+    }
+
+    .regular-price {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .regular-price del {
+      color: #b8c0ce;
+    }
+
+    .discount-note {
+      display: inline-flex;
+      margin-top: 10px;
+      padding: 6px 9px;
+      border: 1px solid
+        rgba(141, 240, 196, 0.22);
+      border-radius: 8px;
+      color: var(--accent);
+      background:
+        rgba(22, 63, 51, 0.45);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns:
+        auto minmax(0, 1fr);
+      gap: 7px 14px;
+      padding-top: 14px;
+      border-top: 1px solid
+        var(--border);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .meta-grid strong {
+      color: #d9deea;
+      font-weight: 700;
+      text-align: right;
+      overflow-wrap: anywhere;
+    }
+
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .product-link {
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 800;
+      text-decoration: none;
+    }
+
+    .product-link:hover {
+      text-decoration: underline;
+    }
+
+    .error-text {
+      color: var(--danger);
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
+    .empty-card {
+      display: grid;
+      min-height: 260px;
+      place-items: center;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .chart-panel {
+      padding: 18px;
+      border: 1px solid
+        var(--border);
+      border-radius: 18px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .chart-controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    .range-selector {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .range-button {
+      min-height: 36px;
+      padding: 0 12px;
+      border: 1px solid
+        var(--border);
+      border-radius: 10px;
+      color: var(--muted);
+      background: var(--panel-soft);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .range-button.active {
+      color: var(--bg);
+      border-color: var(--text);
+      background: var(--text);
+    }
+
+    .discount-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .discount-toggle input {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent);
+    }
+
+    #chart {
+      min-height: 520px;
+    }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-top: 14px;
+      padding: 13px 15px;
+      border: 1px solid
+        var(--border);
+      border-radius: 12px;
+      color: var(--muted);
+      background:
+        rgba(10, 12, 18, 0.55);
+      font-size: 12px;
+    }
+
+    .status-errors {
+      color: var(--danger);
+    }
+
+    .loading {
+      animation:
+        pulse 1.2s ease-in-out
+        infinite alternate;
+    }
+
+    @keyframes pulse {
+      from {
+        opacity: 0.45;
+      }
+
+      to {
+        opacity: 1;
+      }
+    }
+
+    @media (max-width: 900px) {
+      .hero {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .hero-actions {
+        justify-content: flex-start;
+      }
+
+      .overview-grid {
+        grid-template-columns:
+          repeat(2, minmax(0, 1fr));
+      }
+
+      .product-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .shell {
+        width:
+          min(100% - 20px, 1320px);
+        padding-top: 24px;
+      }
+
+      .overview-grid {
+        grid-template-columns:
+          1fr 1fr;
+      }
+
+      .stat {
+        min-height: 96px;
+        padding: 14px;
+      }
+
+      .product-card,
+      .chart-panel {
+        border-radius: 14px;
+      }
+
+      .product-card {
+        padding: 16px;
+      }
+
+      .card-footer,
+      .status-bar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      #chart {
+        min-height: 430px;
+      }
+    }
+  </style>
 </head>
 
 <body>
-
-<main>
-
-    <h1>iFlight Nazgul Price Tracker</h1>
-
-    <div class="subtitle">
-        Deutschland · ELRS 2.4 GHz · GPS · stündliche Erfassung
-    </div>
-
-    <div class="cards">
-
-        <div class="card">
-            <div class="model">
-                Nazgul DC5 ECO
-            </div>
-
-            <div
-                class="price"
-                id="eco-price">
-                –
-            </div>
-
-            <div
-                class="variant"
-                id="eco-variant">
-                Noch keine Daten
-            </div>
+  <main class="shell">
+    <header class="hero">
+      <div>
+        <div class="eyebrow">
+          <span class="live-dot"></span>
+          stündlicher Preis-Tracker
         </div>
 
-        <div class="card">
-            <div class="model">
-                Nazgul Evoque F5 V3 GPS
-            </div>
+        <h1>drone-scraper</h1>
 
-            <div
-                class="price"
-                id="normal-price">
-                –
-            </div>
+        <p class="subtitle">
+          iFlight Nazgul und GEPRC Vapor im direkten Preisvergleich.
+          Reguläre Shoppreise werden historisch gespeichert. Der
+          5-%-Neukundenrabatt wird ausschließlich bei den
+          iFlight-Nazgul-Modellen als zusätzlicher Effektivpreis
+          berechnet.
+        </p>
+      </div>
 
-            <div
-                class="variant"
-                id="normal-variant">
-                Noch keine Daten
-            </div>
+      <div class="hero-actions">
+        <button
+          class="button"
+          id="reload-button"
+          type="button"
+        >
+          Daten neu laden
+        </button>
+
+        <button
+          class="button button-primary"
+          id="collect-button"
+          type="button"
+        >
+          Jetzt Preise abrufen
+        </button>
+      </div>
+    </header>
+
+    <section
+      class="overview-grid"
+      aria-label="Übersicht"
+    >
+      <article class="stat">
+        <div class="stat-label">
+          Drohnen
         </div>
 
-    </div>
+        <div
+          class="stat-value"
+          id="stat-products"
+        >
+          –
+        </div>
 
-    <div class="actions">
+        <div class="stat-detail">
+          aktiv überwacht
+        </div>
+      </article>
 
-        <button
-            id="collect-button"
-            onclick="collectNow()">
-            Jetzt Preis abrufen
-        </button>
+      <article class="stat">
+        <div class="stat-label">
+          Lieferbar
+        </div>
 
-        <span id="tracker-status"></span>
+        <div
+          class="stat-value"
+          id="stat-available"
+        >
+          –
+        </div>
 
-    </div>
+        <div class="stat-detail">
+          laut letztem Abruf
+        </div>
+      </article>
 
-    <div class="range-selector">
+      <article class="stat">
+        <div class="stat-label">
+          Bester aktueller Preis
+        </div>
 
-        <button
-            class="range-button active"
-            data-range="day">
-            Tag
-        </button>
+        <div
+          class="stat-value"
+          id="stat-best"
+        >
+          –
+        </div>
 
-        <button
-            class="range-button"
-            data-range="week">
-            Woche
-        </button>
+        <div
+          class="stat-detail"
+          id="stat-best-detail"
+        >
+          Noch keine Daten
+        </div>
+      </article>
 
-        <button
-            class="range-button"
-            data-range="month">
-            Monat
-        </button>
+      <article class="stat">
+        <div class="stat-label">
+          Letzter Erfolg
+        </div>
 
-        <button
-            class="range-button"
-            data-range="all">
-            Alle
-        </button>
+        <div
+          class="stat-value"
+          id="stat-last-success"
+        >
+          –
+        </div>
 
-    </div>
+        <div class="stat-detail">
+          Europe/Berlin
+        </div>
+      </article>
+    </section>
 
-    <div id="chart"></div>
+    <section class="section">
+      <div class="section-heading">
+        <div>
+          <h2>Aktuelle Preise</h2>
 
-</main>
+          <p>
+            Je Produkt der zuletzt erfolgreich
+            gespeicherte Messwert.
+          </p>
+        </div>
+      </div>
 
-<script>
+      <div
+        class="product-grid"
+        id="product-grid"
+      >
+        <div
+          class="product-card empty-card loading"
+        >
+          Lade Produktdaten …
+        </div>
+      </div>
+    </section>
 
-let selectedRange = "day";
-let allRows = [];
+    <section class="section">
+      <div class="section-heading">
+        <div>
+          <h2>Preisverlauf</h2>
 
+          <p>
+            Alle vier Drohnen auf einer
+            gemeinsamen Zeitachse.
+          </p>
+        </div>
+      </div>
 
-function latest(rows, key) {
-    const matches = rows.filter(
-        row => row.key === key
-    );
+      <div class="chart-panel">
+        <div class="chart-controls">
+          <div
+            class="range-selector"
+            aria-label="Zeitraum"
+          >
+            <button
+              class="range-button active"
+              data-range="day"
+              type="button"
+            >
+              24 h
+            </button>
 
-    return matches.length
-        ? matches[matches.length - 1]
-        : null;
-}
+            <button
+              class="range-button"
+              data-range="week"
+              type="button"
+            >
+              7 Tage
+            </button>
 
+            <button
+              class="range-button"
+              data-range="month"
+              type="button"
+            >
+              30 Tage
+            </button>
 
-function updateCard(rows, key) {
-    const row = latest(
-        rows,
-        key
-    );
+            <button
+              class="range-button"
+              data-range="all"
+              type="button"
+            >
+              Alles
+            </button>
+          </div>
 
-    const price =
-        document.getElementById(
-            `${key}-price`
-        );
+          <label class="discount-toggle">
+            <input
+              id="discount-toggle"
+              type="checkbox"
+              checked
+            >
 
-    const variant =
-        document.getElementById(
-            `${key}-variant`
-        );
+            5 % Neukundenrabatt bei iFlight
+            im Chart einrechnen
+          </label>
+        </div>
 
-    if (!row) {
-        price.textContent = "–";
-        variant.textContent = "Noch keine Daten";
-        return;
-    }
+        <div id="chart"></div>
 
-    price.textContent =
-        `${Number(row.price).toFixed(2)} ${row.currency}`;
+        <div class="status-bar">
+          <span id="tracker-status">
+            Status wird geladen …
+          </span>
 
-    variant.textContent =
-        `${row.variant} · ${
-            row.available
-                ? "lieferbar"
-                : "nicht lieferbar"
-        }`;
-}
+          <span id="tracker-errors"></span>
+        </div>
+      </div>
+    </section>
+  </main>
 
+  <script>
+    let selectedRange = "day";
+    let allRows = [];
+    let products = [];
 
-function filterRowsByRange(rows, range) {
-    if (range === "all") {
-        return rows;
-    }
-
-    const now = new Date();
-
-    const ranges = {
-        day:
-            24 *
-            60 *
-            60 *
-            1000,
-
-        week:
-            7 *
-            24 *
-            60 *
-            60 *
-            1000,
-
-        month:
-            30 *
-            24 *
-            60 *
-            60 *
-            1000,
+    let trackerState = {
+      last_run: null,
+      last_success: null,
+      last_errors: {}
     };
 
-    const cutoff = new Date(
-        now.getTime() - ranges[range]
-    );
 
-    return rows.filter(row => {
-        const timestamp =
-            new Date(row.timestamp);
-
-        return timestamp >= cutoff;
-    });
-}
-
-
-async function updateStatus() {
-    try {
-        const response =
-            await fetch("/api/status");
-
-        if (!response.ok) {
-            throw new Error(
-                `HTTP ${response.status}`
-            );
+    const euroFormatter =
+      new Intl.NumberFormat(
+        "de-DE",
+        {
+          style: "currency",
+          currency: "EUR"
         }
+      );
 
-        const status =
-            await response.json();
 
-        const element =
-            document.getElementById(
-                "tracker-status"
-            );
-
-        if (!status.last_run) {
-            element.textContent =
-                "Noch kein Abruf durchgeführt.";
-
-            return;
-        }
-
-        const lastRun =
-            new Date(status.last_run);
-
-        let text =
-            `Letzter Abruf: ${
-                lastRun.toLocaleString("de-DE")
-            }`;
-
-        const errors =
-            Object.entries(
-                status.last_errors || {}
-            );
-
-        if (errors.length) {
-            text +=
-                " · Fehler: " +
-                errors
-                    .map(
-                        ([key, value]) =>
-                            `${key}: ${value}`
-                    )
-                    .join(" | ");
-        }
-
-        element.textContent = text;
-
-    } catch (error) {
-        console.error(
-            "Status konnte nicht geladen werden:",
-            error
-        );
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
     }
-}
 
 
-function renderGraph() {
-    const rows =
-        filterRowsByRange(
-            allRows,
-            selectedRange
+    function formatMoney(
+      value,
+      currency = "EUR"
+    ) {
+      const number =
+        Number(value);
+
+      if (!Number.isFinite(number)) {
+        return "–";
+      }
+
+      if (currency === "EUR") {
+        return euroFormatter.format(
+          number
+        );
+      }
+
+      return new Intl.NumberFormat(
+        "de-DE",
+        {
+          style: "currency",
+          currency
+        }
+      ).format(number);
+    }
+
+
+    function formatDateTime(value) {
+      if (!value) {
+        return "–";
+      }
+
+      const date =
+        new Date(value);
+
+      if (
+        Number.isNaN(
+          date.getTime()
+        )
+      ) {
+        return value;
+      }
+
+      return new Intl.DateTimeFormat(
+        "de-DE",
+        {
+          dateStyle: "short",
+          timeStyle: "short"
+        }
+      ).format(date);
+    }
+
+
+    function formatTime(value) {
+      if (!value) {
+        return "–";
+      }
+
+      const date =
+        new Date(value);
+
+      if (
+        Number.isNaN(
+          date.getTime()
+        )
+      ) {
+        return "–";
+      }
+
+      return new Intl.DateTimeFormat(
+        "de-DE",
+        {
+          hour: "2-digit",
+          minute: "2-digit"
+        }
+      ).format(date);
+    }
+
+
+    function latestRowFor(key) {
+      const matches =
+        allRows
+          .filter(
+            row =>
+              row.key === key
+          )
+          .sort(
+            (a, b) =>
+              new Date(
+                a.timestamp
+              ).getTime()
+              -
+              new Date(
+                b.timestamp
+              ).getTime()
+          );
+
+      return matches.length
+        ? matches[
+            matches.length - 1
+          ]
+        : null;
+    }
+
+
+    function discountEnabledFor(
+      product
+    ) {
+      const checkbox =
+        document.getElementById(
+          "discount-toggle"
         );
 
-    const config = [
-        {
-            key: "eco",
-            label: "Nazgul ECO",
-        },
-        {
-            key: "normal",
-            label: "Nazgul Evoque",
-        },
-    ];
+      return Boolean(
+        checkbox?.checked
+        &&
+        Number(
+          product
+            ?.new_account_discount_percent
+          || 0
+        ) > 0
+      );
+    }
 
-    const traces =
-        config.map(item => {
 
-            const points =
-                rows.filter(
-                    row =>
-                        row.key === item.key
+    function effectivePrice(
+      row,
+      product,
+      forceDiscount = null
+    ) {
+      const regular =
+        Number(row?.price);
+
+      if (
+        !Number.isFinite(
+          regular
+        )
+      ) {
+        return null;
+      }
+
+      const percent =
+        Number(
+          product
+            ?.new_account_discount_percent
+          || 0
+        );
+
+      const useDiscount =
+        forceDiscount === null
+          ? discountEnabledFor(
+              product
+            )
+          : forceDiscount;
+
+      if (
+        !useDiscount
+        ||
+        percent <= 0
+      ) {
+        return regular;
+      }
+
+      return (
+        regular
+        *
+        (
+          1
+          -
+          percent / 100
+        )
+      );
+    }
+
+
+    function rowsInSelectedRange(
+      rows
+    ) {
+      if (
+        selectedRange === "all"
+      ) {
+        return rows;
+      }
+
+      const now =
+        Date.now();
+
+      const ranges = {
+        day:
+          24
+          * 60
+          * 60
+          * 1000,
+
+        week:
+          7
+          * 24
+          * 60
+          * 60
+          * 1000,
+
+        month:
+          30
+          * 24
+          * 60
+          * 60
+          * 1000
+      };
+
+      const cutoff =
+        now
+        -
+        ranges[
+          selectedRange
+        ];
+
+      return rows.filter(
+        row => {
+          const timestamp =
+            new Date(
+              row.timestamp
+            ).getTime();
+
+          return (
+            Number.isFinite(
+              timestamp
+            )
+            &&
+            timestamp >= cutoff
+          );
+        }
+      );
+    }
+
+
+    function renderOverview() {
+      document
+        .getElementById(
+          "stat-products"
+        )
+        .textContent =
+          String(
+            products.length
+            || 0
+          );
+
+      const latestRows =
+        products
+          .map(
+            product => ({
+              product,
+              row:
+                latestRowFor(
+                  product.key
+                )
+            })
+          )
+          .filter(
+            item =>
+              item.row
+          );
+
+      const available =
+        latestRows.filter(
+          item =>
+            Boolean(
+              item.row.available
+            )
+        ).length;
+
+      document
+        .getElementById(
+          "stat-available"
+        )
+        .textContent =
+          `${available}/${products.length || 0}`;
+
+      const priced =
+        latestRows
+          .map(
+            item => ({
+              ...item,
+              effective:
+                effectivePrice(
+                  item.row,
+                  item.product
+                )
+            })
+          )
+          .filter(
+            item =>
+              Number.isFinite(
+                item.effective
+              )
+          )
+          .sort(
+            (a, b) =>
+              a.effective
+              -
+              b.effective
+          );
+
+      if (priced.length) {
+        const best =
+          priced[0];
+
+        document
+          .getElementById(
+            "stat-best"
+          )
+          .textContent =
+            formatMoney(
+              best.effective,
+              best.row.currency
+            );
+
+        document
+          .getElementById(
+            "stat-best-detail"
+          )
+          .textContent =
+            best.product.short_name;
+      } else {
+        document
+          .getElementById(
+            "stat-best"
+          )
+          .textContent =
+            "–";
+
+        document
+          .getElementById(
+            "stat-best-detail"
+          )
+          .textContent =
+            "Noch keine Daten";
+      }
+
+      document
+        .getElementById(
+          "stat-last-success"
+        )
+        .textContent =
+          formatTime(
+            trackerState.last_success
+          );
+    }
+
+
+    function renderCards() {
+      const grid =
+        document.getElementById(
+          "product-grid"
+        );
+
+      if (!products.length) {
+        grid.innerHTML = `
+          <div
+            class="product-card empty-card"
+          >
+            Keine Produkte konfiguriert.
+          </div>
+        `;
+
+        return;
+      }
+
+      grid.innerHTML =
+        products
+          .map(
+            product => {
+              const row =
+                latestRowFor(
+                  product.key
                 );
 
+              const error =
+                trackerState
+                  .last_errors
+                  ?.[product.key];
+
+              const discount =
+                Number(
+                  product
+                    .new_account_discount_percent
+                  || 0
+                );
+
+              if (!row) {
+                return `
+                  <article class="product-card">
+                    <div class="product-top">
+                      <div class="shop">
+                        ${escapeHtml(product.shop)}
+                      </div>
+
+                      <span
+                        class="badge unavailable"
+                      >
+                        Keine Daten
+                      </span>
+                    </div>
+
+                    <h3 class="product-name">
+                      ${escapeHtml(product.short_name)}
+                    </h3>
+
+                    <div class="price-wrap">
+                      <div class="price">
+                        –
+                      </div>
+
+                      <div class="regular-price">
+                        Noch kein erfolgreicher
+                        Preisabruf.
+                      </div>
+                    </div>
+
+                    ${
+                      error
+                        ? `
+                          <div class="error-text">
+                            ${escapeHtml(error)}
+                          </div>
+                        `
+                        : ""
+                    }
+
+                    <div class="card-footer">
+                      <span></span>
+
+                      <a
+                        class="product-link"
+                        href="${escapeHtml(product.url)}"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Shop öffnen ↗
+                      </a>
+                    </div>
+                  </article>
+                `;
+              }
+
+              const regular =
+                Number(
+                  row.price
+                );
+
+              const discounted =
+                discount > 0
+                  ? effectivePrice(
+                      row,
+                      product,
+                      true
+                    )
+                  : regular;
+
+              const availabilityClass =
+                row.available
+                  ? "available"
+                  : "unavailable";
+
+              const availabilityText =
+                row.available
+                  ? "Lieferbar"
+                  : "Nicht lieferbar";
+
+              const priceHtml =
+                discount > 0
+                  ? `
+                    <div class="price">
+                      ${
+                        formatMoney(
+                          discounted,
+                          row.currency
+                        )
+                      }
+                    </div>
+
+                    <div class="regular-price">
+                      regulär
+                      <del>
+                        ${
+                          formatMoney(
+                            regular,
+                            row.currency
+                          )
+                        }
+                      </del>
+                    </div>
+
+                    <div class="discount-note">
+                      Neukundenpreis ·
+                      −${discount} % bei neuem
+                      iFlight-Account
+                    </div>
+                  `
+                  : `
+                    <div class="price">
+                      ${
+                        formatMoney(
+                          regular,
+                          row.currency
+                        )
+                      }
+                    </div>
+
+                    <div class="regular-price">
+                      regulärer Shoppreis
+                    </div>
+                  `;
+
+              return `
+                <article class="product-card">
+                  <div class="product-top">
+                    <div class="shop">
+                      ${escapeHtml(product.shop)}
+                    </div>
+
+                    <span
+                      class="badge ${availabilityClass}"
+                    >
+                      ${availabilityText}
+                    </span>
+                  </div>
+
+                  <h3 class="product-name">
+                    ${escapeHtml(product.short_name)}
+                  </h3>
+
+                  <div class="price-wrap">
+                    ${priceHtml}
+                  </div>
+
+                  <div class="meta-grid">
+                    <span>
+                      Variante
+                    </span>
+
+                    <strong>
+                      ${
+                        escapeHtml(
+                          row.variant || "–"
+                        )
+                      }
+                    </strong>
+
+                    <span>
+                      Letzter Messwert
+                    </span>
+
+                    <strong>
+                      ${
+                        escapeHtml(
+                          formatDateTime(
+                            row.timestamp
+                          )
+                        )
+                      }
+                    </strong>
+                  </div>
+
+                  <div class="card-footer">
+                    ${
+                      error
+                        ? `
+                          <div class="error-text">
+                            ${escapeHtml(error)}
+                          </div>
+                        `
+                        : "<span></span>"
+                    }
+
+                    <a
+                      class="product-link"
+                      href="${
+                        escapeHtml(
+                          product.url
+                          || row.url
+                        )
+                      }"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Shop öffnen ↗
+                    </a>
+                  </div>
+                </article>
+              `;
+            }
+          )
+          .join("");
+    }
+
+
+    function renderChart() {
+      const rows =
+        rowsInSelectedRange(
+          allRows
+        );
+
+      const traces =
+        products.map(
+          product => {
+            const points =
+              rows
+                .filter(
+                  row =>
+                    row.key
+                    ===
+                    product.key
+                )
+                .sort(
+                  (a, b) =>
+                    new Date(
+                      a.timestamp
+                    ).getTime()
+                    -
+                    new Date(
+                      b.timestamp
+                    ).getTime()
+                );
+
+            const useDiscount =
+              discountEnabledFor(
+                product
+              );
+
             return {
-                name: item.label,
-                type: "scatter",
-                mode: "lines+markers",
+              name:
+                useDiscount
+                  ? (
+                    `${product.short_name} `
+                    +
+                    `(−${product.new_account_discount_percent} %)`
+                  )
+                  : product.short_name,
 
-                x: points.map(
-                    row => row.timestamp
+              type: "scatter",
+              mode: "lines+markers",
+
+              x:
+                points.map(
+                  row =>
+                    row.timestamp
                 ),
 
-                y: points.map(
-                    row => Number(row.price)
+              y:
+                points.map(
+                  row =>
+                    effectivePrice(
+                      row,
+                      product
+                    )
                 ),
 
-                customdata: points.map(
-                    row => [
-                        row.variant,
-                        row.currency,
-                        row.available
-                    ]
+              line: {
+                width: 2.5
+              },
+
+              marker: {
+                size: 6
+              },
+
+              customdata:
+                points.map(
+                  row => [
+                    Number(
+                      row.price
+                    ),
+                    row.currency,
+                    row.variant,
+                    row.available
+                      ? "ja"
+                      : "nein",
+                    useDiscount
+                      ? (
+                        "Neukundenrabatt "
+                        +
+                        `−${product.new_account_discount_percent} %`
+                      )
+                      : "kein Rabatt eingerechnet"
+                  ]
                 ),
 
-                hovertemplate:
-                    "<b>%{fullData.name}</b><br>" +
-                    "%{x}<br>" +
-                    "%{y:.2f} %{customdata[1]}<br>" +
-                    "%{customdata[0]}<br>" +
-                    "Lieferbar: %{customdata[2]}" +
-                    "<extra></extra>",
+              hovertemplate:
+                "<b>%{fullData.name}</b><br>"
+                +
+                "%{x}<br>"
+                +
+                "Angezeigt: "
+                +
+                "%{y:.2f} %{customdata[1]}<br>"
+                +
+                "Regulär: "
+                +
+                "%{customdata[0]:.2f} %{customdata[1]}<br>"
+                +
+                "%{customdata[2]}<br>"
+                +
+                "Lieferbar: %{customdata[3]}<br>"
+                +
+                "%{customdata[4]}"
+                +
+                "<extra></extra>"
             };
-        });
+          }
+        );
 
-
-    const rangeNames = {
+      const rangeNames = {
         day:
-            "Letzte 24 Stunden",
+          "Letzte 24 Stunden",
 
         week:
-            "Letzte 7 Tage",
+          "Letzte 7 Tage",
 
         month:
-            "Letzte 30 Tage",
+          "Letzte 30 Tage",
 
         all:
-            "Gesamter Zeitraum",
-    };
+          "Gesamter Zeitraum"
+      };
 
-
-    Plotly.react(
+      Plotly.react(
         "chart",
         traces,
         {
-            paper_bgcolor:
-                "#191c22",
+          paper_bgcolor:
+            "#11151d",
 
-            plot_bgcolor:
-                "#191c22",
+          plot_bgcolor:
+            "#11151d",
+
+          font: {
+            color:
+              "#dce2ec"
+          },
+
+          title: {
+            text:
+              rangeNames[
+                selectedRange
+              ],
+
+            x: 0.01,
+            xanchor: "left",
 
             font: {
-                color:
-                    "#e8e8e8",
-            },
+              size: 15
+            }
+          },
 
-            title: {
-                text:
-                    rangeNames[
-                        selectedRange
-                    ],
+          margin: {
+            l: 66,
+            r: 22,
+            t: 52,
+            b: 72
+          },
 
-                font: {
-                    size: 16,
-                },
-            },
+          hovermode:
+            "x unified",
 
-            margin: {
-                l: 70,
-                r: 30,
-                t: 60,
-                b: 70,
-            },
+          xaxis: {
+            title: "Zeit",
+            gridcolor:
+              "#252c39",
+            zerolinecolor:
+              "#252c39"
+          },
 
-            hovermode:
-                "x unified",
+          yaxis: {
+            title:
+              "Preis in EUR",
+            rangemode: "tozero",
+            gridcolor:
+              "#252c39",
+            zerolinecolor:
+              "#252c39"
+          },
 
-            xaxis: {
-                title:
-                    "Zeit",
-
-                gridcolor:
-                    "#292d36",
-            },
-
-            yaxis: {
-                title:
-                    "Preis in EUR",
-
-                gridcolor:
-                    "#292d36",
-            },
-
-            legend: {
-                orientation:
-                    "h",
-            },
+          legend: {
+            orientation: "h",
+            y: -0.18
+          }
         },
         {
-            responsive: true,
-            displaylogo: false,
+          responsive: true,
+          displaylogo: false
         }
-    );
-}
-
-
-async function loadGraph() {
-    try {
-        const response =
-            await fetch(
-                "/api/prices"
-            );
-
-        if (!response.ok) {
-            throw new Error(
-                `HTTP ${response.status}`
-            );
-        }
-
-        allRows =
-            await response.json();
-
-        updateCard(
-            allRows,
-            "eco"
-        );
-
-        updateCard(
-            allRows,
-            "normal"
-        );
-
-        renderGraph();
-
-        await updateStatus();
-
-    } catch (error) {
-        console.error(
-            "Preisdaten konnten nicht geladen werden:",
-            error
-        );
+      );
     }
-}
 
 
-async function collectNow() {
-    const button =
+    function renderStatus() {
+      const status =
         document.getElementById(
-            "collect-button"
+          "tracker-status"
         );
 
-    button.disabled = true;
+      const errors =
+        document.getElementById(
+          "tracker-errors"
+        );
 
-    button.textContent =
+      const errorEntries =
+        Object.entries(
+          trackerState
+            .last_errors
+          || {}
+        );
+
+      status.textContent =
+        trackerState.last_run
+          ? (
+            "Letzter Abruf: "
+            +
+            formatDateTime(
+              trackerState.last_run
+            )
+          )
+          : "Noch kein Abruf erfolgt.";
+
+      if (errorEntries.length) {
+        errors.className =
+          "status-errors";
+
+        errors.textContent =
+          `${errorEntries.length} Fehler beim letzten Abruf`;
+      } else {
+        errors.className = "";
+
+        errors.textContent =
+          "Letzter Abruf ohne Fehler";
+      }
+    }
+
+
+    function renderAll() {
+      renderOverview();
+      renderCards();
+      renderChart();
+      renderStatus();
+    }
+
+
+    async function fetchJson(
+      url,
+      options = {}
+    ) {
+      const response =
+        await fetch(
+          url,
+          options
+        );
+
+      if (!response.ok) {
+        throw new Error(
+          `${url}: HTTP ${response.status}`
+        );
+      }
+
+      return response.json();
+    }
+
+
+    async function loadDashboard() {
+      const [
+        statusData,
+        priceData
+      ] =
+        await Promise.all([
+          fetchJson(
+            "/api/status"
+          ),
+          fetchJson(
+            "/api/prices"
+          )
+        ]);
+
+      trackerState =
+        statusData;
+
+      products =
+        statusData.products
+        || [];
+
+      allRows =
+        priceData
+        || [];
+
+      renderAll();
+    }
+
+
+    async function collectNow() {
+      const button =
+        document.getElementById(
+          "collect-button"
+        );
+
+      const originalText =
+        button.textContent;
+
+      button.disabled = true;
+
+      button.textContent =
         "Abruf läuft …";
 
-    try {
-        const response =
-            await fetch(
-                "/api/collect",
-                {
-                    method: "POST"
-                }
-            );
-
-        if (!response.ok) {
-            throw new Error(
-                `HTTP ${response.status}`
-            );
-        }
-
-        await loadGraph();
-
-    } catch (error) {
-        console.error(
-            "Preisabruf fehlgeschlagen:",
-            error
+      try {
+        await fetchJson(
+          "/api/collect",
+          {
+            method: "POST"
+          }
         );
 
-    } finally {
+        await loadDashboard();
+      } catch (error) {
+        console.error(error);
+
+        alert(
+          "Preisabruf fehlgeschlagen: "
+          +
+          error.message
+        );
+      } finally {
         button.disabled = false;
 
         button.textContent =
-            "Jetzt Preis abrufen";
+          originalText;
+      }
     }
-}
 
 
-document
-    .querySelectorAll(
-        ".range-button"
-    )
-    .forEach(button => {
+    async function reloadDashboard() {
+      const button =
+        document.getElementById(
+          "reload-button"
+        );
 
-        button.addEventListener(
-            "click",
-            () => {
+      const originalText =
+        button.textContent;
 
+      button.disabled = true;
+
+      button.textContent =
+        "Lade …";
+
+      try {
+        await loadDashboard();
+      } catch (error) {
+        console.error(error);
+
+        alert(
+          "Daten konnten nicht geladen werden: "
+          +
+          error.message
+        );
+      } finally {
+        button.disabled = false;
+
+        button.textContent =
+          originalText;
+      }
+    }
+
+
+    function bindControls() {
+      document
+        .querySelectorAll(
+          ".range-button"
+        )
+        .forEach(
+          button => {
+            button.addEventListener(
+              "click",
+              () => {
                 selectedRange =
-                    button.dataset.range;
+                  button.dataset.range;
 
                 document
-                    .querySelectorAll(
-                        ".range-button"
-                    )
-                    .forEach(item => {
-                        item.classList.remove(
-                            "active"
-                        );
-                    });
+                  .querySelectorAll(
+                    ".range-button"
+                  )
+                  .forEach(
+                    item => {
+                      item.classList.toggle(
+                        "active",
+                        item.dataset.range
+                        ===
+                        selectedRange
+                      );
+                    }
+                  );
 
-                button.classList.add(
-                    "active"
-                );
-
-                renderGraph();
-            }
+                renderChart();
+              }
+            );
+          }
         );
-    });
+
+      document
+        .getElementById(
+          "discount-toggle"
+        )
+        .addEventListener(
+          "change",
+          () => {
+            renderOverview();
+            renderChart();
+          }
+        );
+
+      document
+        .getElementById(
+          "collect-button"
+        )
+        .addEventListener(
+          "click",
+          collectNow
+        );
+
+      document
+        .getElementById(
+          "reload-button"
+        )
+        .addEventListener(
+          "click",
+          reloadDashboard
+        );
+    }
 
 
-loadGraph();
+    document.addEventListener(
+      "DOMContentLoaded",
+      async () => {
+        bindControls();
 
+        try {
+          await loadDashboard();
+        } catch (error) {
+          console.error(error);
 
-// Webseite jede Minute aktualisieren.
-// Der eigentliche automatische Preisabruf
-// findet weiterhin serverseitig jede Stunde statt.
-setInterval(
-    loadGraph,
-    60_000
-);
+          document
+            .getElementById(
+              "product-grid"
+            )
+            .innerHTML = `
+              <div
+                class="product-card empty-card"
+              >
+                Daten konnten nicht geladen werden.
+                <br>
+                ${escapeHtml(error.message)}
+              </div>
+            `;
 
-</script>
+          document
+            .getElementById(
+              "tracker-status"
+            )
+            .textContent =
+              "Backend nicht erreichbar oder API-Fehler.";
+        }
 
+        // Nur UI aktualisieren.
+        // Kein zusätzlicher Scrape.
+        window.setInterval(
+          () => {
+            loadDashboard()
+              .catch(
+                console.error
+              );
+          },
+          5 * 60 * 1000
+        );
+      }
+    );
+  </script>
 </body>
 </html>

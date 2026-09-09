@@ -1,12 +1,12 @@
 [Unit]
-Description=iFlight Nazgul Price Tracker
+Description=drone-scraper FPV Price Tracker
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
 User=pi
-WorkingDirectory=/home/pi/Documents/iflight-nazgul-scraper
+WorkingDirectory=/home/pi/Documents/drone-scraper
 ExecStart=/home/pi/.local/bin/uv run python main.py
 Restart=on-failure
 RestartSec=10
