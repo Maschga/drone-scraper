@@ -1,7 +1,7 @@
 [project]
 name = "drone-scraper"
-version = "0.3.0"
-description = "Hourly FPV drone price tracker for iFlight, FPV24 and Rotorama"
+version = "0.5.0"
+description = "EU FPV drone price tracker with ELRS/GPS variant separation"
 requires-python = ">=3.12"
 
 dependencies = [

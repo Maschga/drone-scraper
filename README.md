@@ -1,58 +1,155 @@
 # drone-scraper
 
-Preis-Tracker für FPV-Drohnen mit FastAPI, stündlicher Erfassung,
-CSV-Preisverlauf und responsiver Weboberfläche.
+EU-Preis-Tracker für:
 
-## Überwachte Modelle
+- iFlight Nazgul DC5 ECO O4 Pro
+- iFlight Nazgul Evoque F5 V3 O4 Pro
+- GEPRC Vapor D5 O4 Pro
 
-- iFlight Nazgul DC5 O4 ECO V1.1 6S HD
-- iFlight Nazgul Evoque F5 V3 O4 GPS
-- GEPRC Vapor D5 O4 Pro - 6S ELRS mit GPS (Rotorama)
-- GEPRC Vapor-D5 HD DJI O4 Pro ELRS 2.4G (FPV24)
+## Deine Konfiguration
 
-Die frühere Vapor D6 wurde entfernt.
+Der Tracker ist jetzt ausdrücklich auf folgende Regeln eingestellt:
 
-## Shops
+- **immer ELRS 2.4 GHz**
+- **Nazgul DC5 / Evoque: immer mit GPS**
+- **Vapor D5: GPS und ohne GPS werden getrennt**
+- beim Vapor wird eine Variante **ohne GPS** nicht mit einer GPS-Variante
+  in derselben Preislinie vermischt
 
-Die iFlight-Nazgul-Produkte werden über die Shopify-Produkt-API von
-iFlight Europe abgefragt.
+Dadurch wird nicht mehr versehentlich ein günstigerer Preis einer
+schlechter passenden Konfiguration als Vergleichspreis dargestellt.
 
-Die beiden Vapor-D5-Angebote werden direkt von Rotorama und FPV24
-aus den Produktseiten ausgelesen.
+## Aufgenommene Shops / Varianten
 
-## iFlight-Neukundenrabatt
+### iFlight Europe
 
-Für die beiden iFlight-Nazgul-Produkte ist ein
-5-%-Neukundenrabatt konfiguriert.
+- Nazgul DC5 ECO O4 Pro — ELRS 2.4 GHz + GPS
+- Nazgul Evoque F5 V3 O4 Pro — ELRS 2.4 GHz + GPS
 
-Der Scraper speichert den aktuellen iFlight-Shoppreis und zusätzlich:
+Die Shopify-Auswahl sucht explizit nach `elrs`, `2.4` **und** `gps`.
+
+### FPV24
+
+- Vapor D5 O4 Pro — ELRS 2.4 GHz + GPS
+
+Die aktuell geführte FPV24-Produktseite nennt ein integriertes
+GEP-M10-GPS.
+
+### Rotorama
+
+- Nazgul Evoque F5 V3 O4 Pro — ELRS 2.4 GHz + GPS
+- Vapor D5 O4 Pro — ELRS 2.4 GHz + GPS
+
+Der Rotorama DC5 ECO ELRS ohne GPS wird bewusst nicht in die
+Wunschkonfiguration aufgenommen, weil bei iFlight-Modellen GPS Pflicht
+ist.
+
+### RCTech.de
+
+- Nazgul DC5 ECO O4 Pro — ELRS 2.4 GHz + GPS
+- Vapor D5 O4 Pro — ELRS 2.4 GHz + GPS
+
+Für die betrachteten Drohnen gilt innerhalb Deutschlands die
+Versandkostenfreiheit ab 99 EUR.
+
+### HobbyDrone.cz
+
+- Nazgul DC5 ECO O4 Pro — ELRS 2.4 GHz + GPS
+- Vapor D5 O4 Pro — ELRS 2.4 GHz **ohne GPS**
+- Vapor D5 O4 Pro — ELRS 2.4 GHz **mit GPS**
+
+HobbyDrone ist damit besonders interessant für den Vapor-Vergleich,
+weil beide Ausstattungen als eigene Produktseiten geführt werden.
+
+Ein Evoque F5 V3 O4 Pro ELRS 2.4 GHz ist dort gelistet, aber nicht als
+klar passende GPS-Konfiguration; er wird deshalb nicht als
+Wunschkonfiguration getrackt.
+
+## GPS-Trennung
+
+In `PRODUCTS` besitzt jedes Angebot:
 
 ```text
-shop_discounted
+family
+receiver
+gps
 ```
 
-Dabei gilt sinngemäß:
+Beispiel:
+
+```text
+family   = vapor-d5
+receiver = ELRS 2.4 GHz
+gps      = false
+```
+
+oder:
+
+```text
+family   = vapor-d5
+receiver = ELRS 2.4 GHz
+gps      = true
+```
+
+Die Weboberfläche erzeugt daraus getrennte Bereiche:
+
+```text
+GEPRC Vapor D5 · ohne GPS · ELRS 2.4 GHz
+GEPRC Vapor D5 · mit GPS  · ELRS 2.4 GHz
+```
+
+Auch die Chart-Linien bleiben getrennt.
+
+## iFlight 5-%-Neukundenrabatt
+
+Der zusätzliche 5-%-Rabatt wird nur angewendet, wenn der aktuelle
+Shopify-Variantenpreis **nicht bereits reduziert** ist.
 
 ```text
 shop_discounted = compare_at_price > price
 ```
 
-Wenn iFlight den Variantenpreis bereits reduziert hat, werden die
-zusätzlichen 5 % nicht noch einmal abgezogen.
+Wenn `shop_discounted = true`, wird kein weiterer 5-%-Rabatt
+eingerechnet.
 
-Nur wenn der Shoppreis nicht bereits reduziert ist:
+## Versand Deutschland
+
+Aktuell verwendete Regeln:
+
+- **FPV24:** unter 100 EUR = 6,90 EUR; unter 150 EUR = 5,90 EUR;
+  ab 150 EUR = 3,90 EUR
+- **Rotorama:** GLS Deutschland = 5,49 EUR
+- **RCTech.de:** Versandkostenfrei innerhalb Deutschlands ab 99 EUR
+- **iFlight Europe:** konkreter Betrag / Gratisgrenze im Checkout
+- **HobbyDrone.cz:** EU-Hauszustellung ab 4,90 EUR; exakter Preis
+  abhängig von Zielland/Bestellung und daher im Checkout
+
+Bei dynamischem Versand wird kein erfundener Betrag in den
+Gesamtpreis gerechnet.
+
+## CSV
+
+`data/prices.csv` enthält:
 
 ```text
-Neukundenpreis = Shoppreis × 0,95
+timestamp
+key
+family
+name
+variant
+receiver
+gps
+price
+currency
+available
+url
+shop_discounted
+shipping_cost
+shipping_note
 ```
 
-## Bestehende CSV-Dateien
-
-Ältere `data/prices.csv`-Dateien ohne `shop_discounted` werden beim
-nächsten Schreiben automatisch auf das neue Schema migriert.
-
-Die alten Keys `eco` und `normal` werden beim Lesen weiterhin auf
-`iflight-nazgul-dc5` bzw. `iflight-nazgul-evoque` gemappt.
+Ältere CSV-Dateien werden beim nächsten Schreiben automatisch
+auf das neue Schema migriert.
 
 ## Installation
 
@@ -62,7 +159,11 @@ uv sync
 uv run python main.py
 ```
 
-Danach ist die Website unter `http://localhost:8000` erreichbar.
+Danach:
+
+```text
+http://localhost:8000
+```
 
 ## API
 
@@ -72,43 +173,29 @@ GET  /api/status
 POST /api/collect
 ```
 
-## Daten
+## Quellen / Produktseiten
 
-`data/prices.csv` enthält:
-
-```text
-timestamp
-key
-name
-variant
-price
-currency
-available
-url
-shop_discounted
-```
-
-## Automatische Erfassung
-
-Beim Programmstart wird sofort ein Preisabruf ausgeführt.
-Danach läuft der Abruf einmal pro Stunde.
-
-## systemd
-
-Die mitgelieferte Service-Datei erwartet:
-
-```text
-/home/pi/Documents/drone-scraper
-```
-
-Installation:
-
-```bash
-make install
-```
-
-Nach Code-Änderungen:
-
-```bash
-make reload
-```
+- iFlight DC5:
+  https://iflight-rc.eu/products/nazgul-dc5-o4-eco-v1-1-6s-hd
+- iFlight Evoque:
+  https://iflight-rc.eu/products/nazgul-evoque-f5-v3-o4-gps
+- FPV24 Vapor:
+  https://www.fpv24.com/de/geprc/geprc-vapor-d5-hd-dji-o4-pro-fpv-drohne-elrs-24g
+- Rotorama Evoque:
+  https://www.rotorama.de/product/iflight-nazgul-evoque-f5-v3-o4-pro-6s-elrs-s-gps
+- Rotorama Vapor:
+  https://www.rotorama.de/product/geprc-vapor-d5-o4-pro-elrs-2-4g
+- RCTech DC5:
+  https://www.rctech.de/iflight-nazgul-dc5-eco-v11-o4-pro-bnf-elrs-24ghz-gps-fpv-drone
+- RCTech Vapor:
+  https://www.rctech.de/?a=7717&lang=eng
+- HobbyDrone DC5 GPS:
+  https://www.hobbydrone.cz/de/fpv-drone-iflight-nazgul-dc5-eco-v1-1-o4-pro-bnf-elrs-2-4ghz-gps/
+- HobbyDrone Vapor ohne GPS:
+  https://www.hobbydrone.cz/de/fpv-drone-geprc-vapor-d5-o4-pro-elrs-2-4ghz/
+- HobbyDrone Vapor GPS:
+  https://www.hobbydrone.cz/de/fpv-drone-geprc-vapor-d5-o4-pro-elrs-2-4ghz-gps/
+- HobbyDrone Versand:
+  https://www.hobbydrone.cz/de/versand-und-zahlungen/
+- RCTech Versandhinweis:
+  https://www.rctech.de/wir-ueber-uns

@@ -25,52 +25,217 @@ TIMEZONE = ZoneInfo("Europe/Berlin")
 IFLIGHT_STORE_URL = "https://iflight-rc.eu"
 
 
+# ---------------------------------------------------------------------------
+# Produktkonfiguration
+# ---------------------------------------------------------------------------
+#
+# Grundregel:
+# - ausschließlich ELRS 2.4 GHz
+# - iFlight Nazgul: nur GPS-Angebote
+# - GEPRC Vapor D5: GPS und ohne GPS werden getrennt geführt
+#
+# So werden unterschiedliche Ausstattungen nicht mehr in einer Preislinie
+# vermischt.
+# ---------------------------------------------------------------------------
+
 PRODUCTS = [
+    # -----------------------------------------------------------------------
+    # iFlight Europe – gewünschte GPS-Konfiguration
+    # -----------------------------------------------------------------------
     {
-        "key": "iflight-nazgul-dc5",
-        "name": "iFlight Nazgul DC5 O4 ECO V1.1 6S HD",
+        "key": "iflight-dc5-gps",
+        "family": "nazgul-dc5",
+        "name": "iFlight Nazgul DC5 ECO V1.1 O4 Pro ELRS 2.4GHz + GPS",
         "short_name": "Nazgul DC5 ECO",
         "shop": "iFlight Europe",
         "source": "iflight_shopify",
         "handle": "nazgul-dc5-o4-eco-v1-1-6s-hd",
-        "variant_terms": ["elrs", "2.4"],
+        "variant_terms": ["elrs", "2.4", "gps"],
+        "receiver": "ELRS 2.4 GHz",
+        "gps": True,
         "new_account_discount_percent": 5,
+        "shipping_mode": "checkout",
+        "shipping_label": "Versandpreis/Gratisgrenze im iFlight-Checkout",
     },
     {
-        "key": "iflight-nazgul-evoque",
-        "name": "iFlight Nazgul Evoque F5 V3 O4 GPS",
+        "key": "iflight-evoque-gps",
+        "family": "nazgul-evoque",
+        "name": "iFlight Nazgul Evoque F5 V3 O4 Pro ELRS 2.4GHz + GPS",
         "short_name": "Nazgul Evoque F5 V3",
         "shop": "iFlight Europe",
         "source": "iflight_shopify",
         "handle": "nazgul-evoque-f5-v3-o4-gps",
-        "variant_terms": ["elrs", "2.4"],
+        "variant_terms": ["elrs", "2.4", "gps"],
+        "receiver": "ELRS 2.4 GHz",
+        "gps": True,
         "new_account_discount_percent": 5,
+        "shipping_mode": "checkout",
+        "shipping_label": "Versandpreis/Gratisgrenze im iFlight-Checkout",
     },
+
+    # -----------------------------------------------------------------------
+    # FPV24 – Vapor D5, Produktseite ist die GPS-Version
+    # -----------------------------------------------------------------------
     {
-        "key": "geprc-vapor-d5-rotorama",
-        "name": "GEPRC Vapor D5 O4 Pro - 6S ELRS mit GPS",
-        "short_name": "GEPRC Vapor-D5",
-        "shop": "Rotorama",
-        "source": "rotorama_html",
-        "url": (
-            "https://www.rotorama.de/product/"
-            "geprc-vapor-d5-o4-pro-elrs-2-4g"
-        ),
-        "variant": "6S ELRS 2.4G + GPS",
-        "new_account_discount_percent": 0,
-    },
-    {
-        "key": "geprc-vapor-d5",
-        "name": "GEPRC Vapor-D5 HD DJI O4 Pro FPV Drohne ELRS 2.4G",
+        "key": "fpv24-vapor-d5-gps",
+        "family": "vapor-d5",
+        "name": "GEPRC Vapor-D5 O4 Pro ELRS 2.4GHz + GPS",
         "short_name": "GEPRC Vapor-D5",
         "shop": "FPV24",
-        "source": "fpv24_html",
+        "source": "html",
         "url": (
             "https://www.fpv24.com/de/geprc/"
             "geprc-vapor-d5-hd-dji-o4-pro-fpv-drohne-elrs-24g"
         ),
-        "variant": "ELRS 2.4G",
+        "referer": "https://www.fpv24.com/",
+        "receiver": "ELRS 2.4 GHz",
+        "gps": True,
         "new_account_discount_percent": 0,
+        "shipping_mode": "fpv24_de",
+        "shipping_label": "DHL/DPD Deutschland",
+    },
+
+    # -----------------------------------------------------------------------
+    # Rotorama
+    # DC5 ohne GPS wird bewusst nicht aufgenommen, da bei iFlight GPS Pflicht.
+    # -----------------------------------------------------------------------
+    {
+        "key": "rotorama-evoque-gps",
+        "family": "nazgul-evoque",
+        "name": "iFlight Nazgul Evoque F5 V3 O4 Pro 6S ELRS + GPS",
+        "short_name": "Nazgul Evoque F5 V3",
+        "shop": "Rotorama",
+        "source": "html",
+        "url": (
+            "https://www.rotorama.de/product/"
+            "iflight-nazgul-evoque-f5-v3-o4-pro-6s-elrs-s-gps"
+        ),
+        "referer": "https://www.rotorama.de/",
+        "receiver": "ELRS 2.4 GHz",
+        "gps": True,
+        "new_account_discount_percent": 0,
+        "shipping_mode": "fixed",
+        "shipping_cost": "5.49",
+        "shipping_label": "GLS Deutschland",
+    },
+    {
+        "key": "rotorama-vapor-d5-gps",
+        "family": "vapor-d5",
+        "name": "GEPRC Vapor D5 O4 Pro 6S ELRS + GPS",
+        "short_name": "GEPRC Vapor-D5",
+        "shop": "Rotorama",
+        "source": "html",
+        "url": (
+            "https://www.rotorama.de/product/"
+            "geprc-vapor-d5-o4-pro-elrs-2-4g"
+        ),
+        "referer": "https://www.rotorama.de/",
+        "receiver": "ELRS 2.4 GHz",
+        "gps": True,
+        "new_account_discount_percent": 0,
+        "shipping_mode": "fixed",
+        "shipping_cost": "5.49",
+        "shipping_label": "GLS Deutschland",
+    },
+
+    # -----------------------------------------------------------------------
+    # RCTech.de
+    # Versand innerhalb Deutschlands ab 99 EUR kostenlos.
+    # -----------------------------------------------------------------------
+    {
+        "key": "rctech-dc5-gps",
+        "family": "nazgul-dc5",
+        "name": "iFlight Nazgul DC5 ECO V1.1 O4 Pro ELRS 2.4GHz + GPS",
+        "short_name": "Nazgul DC5 ECO",
+        "shop": "RCTech.de",
+        "source": "html",
+        "url": (
+            "https://www.rctech.de/"
+            "iflight-nazgul-dc5-eco-v11-o4-pro-bnf-elrs-24ghz-gps-fpv-drone"
+        ),
+        "referer": "https://www.rctech.de/",
+        "receiver": "ELRS 2.4 GHz",
+        "gps": True,
+        "new_account_discount_percent": 0,
+        "shipping_mode": "fixed",
+        "shipping_cost": "0.00",
+        "shipping_label": "Versandkostenfrei ab 99 EUR (DE)",
+    },
+    {
+        "key": "rctech-vapor-d5-gps",
+        "family": "vapor-d5",
+        "name": "GEPRC Vapor-D5 O4 Pro ELRS 2.4GHz + GPS",
+        "short_name": "GEPRC Vapor-D5",
+        "shop": "RCTech.de",
+        "source": "html",
+        "url": "https://www.rctech.de/?a=7717&lang=eng",
+        "referer": "https://www.rctech.de/",
+        "receiver": "ELRS 2.4 GHz",
+        "gps": True,
+        "new_account_discount_percent": 0,
+        "shipping_mode": "fixed",
+        "shipping_cost": "0.00",
+        "shipping_label": "Versandkostenfrei ab 99 EUR (DE)",
+    },
+
+    # -----------------------------------------------------------------------
+    # HobbyDrone.cz
+    # DC5 nur als gewünschte GPS-Version.
+    # Vapor D5 bewusst in beiden GPS-Ausführungen getrennt.
+    # -----------------------------------------------------------------------
+    {
+        "key": "hobbydrone-dc5-gps",
+        "family": "nazgul-dc5",
+        "name": "iFlight Nazgul DC5 ECO V1.1 O4 Pro ELRS 2.4GHz + GPS",
+        "short_name": "Nazgul DC5 ECO",
+        "shop": "HobbyDrone.cz",
+        "source": "html",
+        "url": (
+            "https://www.hobbydrone.cz/de/"
+            "fpv-drone-iflight-nazgul-dc5-eco-v1-1-o4-pro-bnf-elrs-2-4ghz-gps/"
+        ),
+        "referer": "https://www.hobbydrone.cz/de/",
+        "receiver": "ELRS 2.4 GHz",
+        "gps": True,
+        "new_account_discount_percent": 0,
+        "shipping_mode": "checkout",
+        "shipping_label": "EU-Hauszustellung ab 4,90 EUR; exakt im Checkout",
+    },
+    {
+        "key": "hobbydrone-vapor-d5-nogps",
+        "family": "vapor-d5",
+        "name": "GEPRC Vapor-D5 O4 Pro ELRS 2.4GHz ohne GPS",
+        "short_name": "GEPRC Vapor-D5",
+        "shop": "HobbyDrone.cz",
+        "source": "html",
+        "url": (
+            "https://www.hobbydrone.cz/de/"
+            "fpv-drone-geprc-vapor-d5-o4-pro-elrs-2-4ghz/"
+        ),
+        "referer": "https://www.hobbydrone.cz/de/",
+        "receiver": "ELRS 2.4 GHz",
+        "gps": False,
+        "new_account_discount_percent": 0,
+        "shipping_mode": "checkout",
+        "shipping_label": "EU-Hauszustellung ab 4,90 EUR; exakt im Checkout",
+    },
+    {
+        "key": "hobbydrone-vapor-d5-gps",
+        "family": "vapor-d5",
+        "name": "GEPRC Vapor-D5 O4 Pro ELRS 2.4GHz + GPS",
+        "short_name": "GEPRC Vapor-D5",
+        "shop": "HobbyDrone.cz",
+        "source": "html",
+        "url": (
+            "https://www.hobbydrone.cz/de/"
+            "fpv-drone-geprc-vapor-d5-o4-pro-elrs-2-4ghz-gps/"
+        ),
+        "referer": "https://www.hobbydrone.cz/de/",
+        "receiver": "ELRS 2.4 GHz",
+        "gps": True,
+        "new_account_discount_percent": 0,
+        "shipping_mode": "checkout",
+        "shipping_label": "EU-Hauszustellung ab 4,90 EUR; exakt im Checkout",
     },
 ]
 
@@ -78,18 +243,35 @@ PRODUCTS = [
 CSV_FIELDS = [
     "timestamp",
     "key",
+    "family",
     "name",
     "variant",
+    "receiver",
+    "gps",
     "price",
     "currency",
     "available",
     "url",
     "shop_discounted",
+    "shipping_cost",
+    "shipping_note",
 ]
 
+
+# Historische Keys auf die heute passende Variante abbilden.
 LEGACY_KEY_MAP = {
-    "eco": "iflight-nazgul-dc5",
-    "normal": "iflight-nazgul-evoque",
+    "eco": "iflight-dc5-gps",
+    "normal": "iflight-evoque-gps",
+    "iflight-nazgul-dc5": "iflight-dc5-gps",
+    "iflight-nazgul-evoque": "iflight-evoque-gps",
+    "geprc-vapor-d5": "fpv24-vapor-d5-gps",
+    "geprc-vapor-d5-rotorama": "rotorama-vapor-d5-gps",
+}
+
+
+PRODUCT_BY_KEY = {
+    product["key"]: product
+    for product in PRODUCTS
 }
 
 
@@ -103,14 +285,19 @@ state = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Hilfsfunktionen
+# ---------------------------------------------------------------------------
+
 def normalize(text: str) -> str:
-    return re.sub(r"\s+", " ", text.lower()).strip()
+    return re.sub(
+        r"\s+",
+        " ",
+        text.lower(),
+    ).strip()
 
 
 def shopify_price(raw_price) -> Decimal:
-    """
-    Shopify /products/...js liefert Preise normalerweise in Cent.
-    """
     if isinstance(raw_price, int):
         return Decimal(raw_price) / Decimal("100")
 
@@ -122,12 +309,16 @@ def shopify_price(raw_price) -> Decimal:
     if re.fullmatch(r"-?\d+", text):
         return Decimal(text) / Decimal("100")
 
-    return Decimal(text.replace(",", "."))
+    return Decimal(
+        text.replace(",", ".")
+    )
 
 
-def parse_euro_price(raw_value: str) -> Decimal | None:
+def parse_euro_price(
+    raw_value: str,
+) -> Decimal | None:
     """
-    Erkennt z. B. 489,09 €, 539.90 EUR, 1.234,56 € oder 1,234.56.
+    Erkennt z.B. 489,09 EUR, 539.90 EUR oder 1.234,56 EUR.
     """
     text = (
         str(raw_value)
@@ -140,7 +331,9 @@ def parse_euro_price(raw_value: str) -> Decimal | None:
     )
 
     matches = re.findall(
-        r"(?<!\d)(\d{1,4}(?:[.\s]\d{3})*[,.]\d{2})(?!\d)",
+        r"(?<!\d)"
+        r"(\d{1,4}(?:[.\s]\d{3})*[,.]\d{2})"
+        r"(?!\d)",
         text,
     )
 
@@ -149,7 +342,11 @@ def parse_euro_price(raw_value: str) -> Decimal | None:
 
         if "," in token and "." in token:
             if token.rfind(",") > token.rfind("."):
-                token = token.replace(".", "").replace(",", ".")
+                token = (
+                    token
+                    .replace(".", "")
+                    .replace(",", ".")
+                )
             else:
                 token = token.replace(",", "")
         elif "," in token:
@@ -160,31 +357,59 @@ def parse_euro_price(raw_value: str) -> Decimal | None:
         except InvalidOperation:
             continue
 
-        if Decimal("50") <= value <= Decimal("5000"):
+        if (
+            Decimal("50")
+            <= value
+            <= Decimal("5000")
+        ):
             return value
 
     return None
 
 
-def choose_variant(product: dict, required_terms: list[str]) -> dict:
+def choose_variant(
+    product: dict,
+    required_terms: list[str],
+) -> dict:
+    """
+    Sucht exakt die konfigurierte Shopify-Variante.
+    Bei iFlight enthalten required_terms auch "gps", damit nie
+    versehentlich die günstigere Nicht-GPS-Version im Vergleich landet.
+    """
     variants = product.get("variants", [])
     matching = []
 
     for variant in variants:
-        title = normalize(str(variant.get("title", "")))
+        title = normalize(
+            str(
+                variant.get(
+                    "title",
+                    "",
+                )
+            )
+        )
 
-        if all(term.lower() in title for term in required_terms):
+        if all(
+            term.lower() in title
+            for term in required_terms
+        ):
             matching.append(variant)
 
     if not matching:
-        available_titles = [
-            str(variant.get("title", ""))
+        titles = [
+            str(
+                variant.get(
+                    "title",
+                    "",
+                )
+            )
             for variant in variants
         ]
+
         raise RuntimeError(
             "Keine passende Variante gefunden. "
             f"Gesucht: {required_terms}. "
-            f"Vorhandene Varianten: {available_titles}"
+            f"Vorhandene Varianten: {titles}"
         )
 
     for variant in matching:
@@ -193,6 +418,101 @@ def choose_variant(product: dict, required_terms: list[str]) -> dict:
 
     return matching[0]
 
+
+def shipping_for_product(
+    config: dict,
+    price: Decimal,
+) -> tuple[Decimal | None, str]:
+    mode = config.get(
+        "shipping_mode",
+        "checkout",
+    )
+
+    if mode == "fixed":
+        return (
+            Decimal(
+                str(
+                    config["shipping_cost"]
+                )
+            ),
+            str(
+                config.get(
+                    "shipping_label",
+                    "Versand",
+                )
+            ),
+        )
+
+    if mode == "fpv24_de":
+        if price < Decimal("100"):
+            cost = Decimal("6.90")
+        elif price < Decimal("150"):
+            cost = Decimal("5.90")
+        else:
+            cost = Decimal("3.90")
+
+        return (
+            cost,
+            str(
+                config.get(
+                    "shipping_label",
+                    "Versand Deutschland",
+                )
+            ),
+        )
+
+    return (
+        None,
+        str(
+            config.get(
+                "shipping_label",
+                "Versand im Checkout",
+            )
+        ),
+    )
+
+
+def base_result(
+    config: dict,
+    *,
+    variant: str,
+    price: Decimal,
+    currency: str,
+    available: bool,
+    url: str,
+    shop_discounted: bool = False,
+) -> dict:
+    shipping_cost, shipping_note = (
+        shipping_for_product(
+            config,
+            price,
+        )
+    )
+
+    return {
+        "key": config["key"],
+        "family": config["family"],
+        "name": config["name"],
+        "variant": variant,
+        "receiver": config["receiver"],
+        "gps": bool(config["gps"]),
+        "price": f"{price:.2f}",
+        "currency": currency,
+        "available": available,
+        "url": url,
+        "shop_discounted": shop_discounted,
+        "shipping_cost": (
+            f"{shipping_cost:.2f}"
+            if shipping_cost is not None
+            else ""
+        ),
+        "shipping_note": shipping_note,
+    }
+
+
+# ---------------------------------------------------------------------------
+# iFlight / Shopify
+# ---------------------------------------------------------------------------
 
 async def set_iflight_german_context(
     client: httpx.AsyncClient,
@@ -207,6 +527,7 @@ async def set_iflight_german_context(
             "return_to": "/",
         },
     )
+
     response.raise_for_status()
 
 
@@ -216,9 +537,13 @@ async def get_iflight_currency(
     response = await client.get(
         f"{IFLIGHT_STORE_URL}/cart.js"
     )
+
     response.raise_for_status()
-    data = response.json()
-    return data.get("currency", "EUR")
+
+    return response.json().get(
+        "currency",
+        "EUR",
+    )
 
 
 async def fetch_iflight_product(
@@ -235,25 +560,41 @@ async def fetch_iflight_product(
     response.raise_for_status()
 
     product = response.json()
+
     variant = choose_variant(
         product,
         config["variant_terms"],
     )
 
-    price = shopify_price(variant["price"])
+    price = shopify_price(
+        variant["price"]
+    )
 
-    compare_at_raw = variant.get("compare_at_price")
+    compare_at_raw = variant.get(
+        "compare_at_price"
+    )
+
     compare_at_price = None
 
-    if compare_at_raw not in (None, ""):
+    if compare_at_raw not in (
+        None,
+        "",
+    ):
         try:
-            compare_at_price = shopify_price(
-                compare_at_raw
+            compare_at_price = (
+                shopify_price(
+                    compare_at_raw
+                )
             )
-        except (InvalidOperation, TypeError, ValueError):
+        except (
+            InvalidOperation,
+            TypeError,
+            ValueError,
+        ):
             compare_at_price = None
 
-    # Zusätzliche 5 % nur, wenn der Shoppreis nicht bereits reduziert ist.
+    # 5-%-Neukundenrabatt darf nur zusätzlich gerechnet werden,
+    # wenn iFlight nicht bereits selbst rabattiert.
     shop_discounted = bool(
         compare_at_price is not None
         and compare_at_price > price
@@ -264,24 +605,35 @@ async def fetch_iflight_product(
         f"{config['handle']}"
     )
 
-    return {
-        "key": config["key"],
-        "name": config["name"],
-        "variant": variant.get("title", ""),
-        "price": f"{price:.2f}",
-        "currency": currency,
-        "available": bool(
-            variant.get("available", False)
+    return base_result(
+        config,
+        variant=str(
+            variant.get(
+                "title",
+                "",
+            )
         ),
-        "url": product_url,
-        "shop_discounted": shop_discounted,
-    }
+        price=price,
+        currency=currency,
+        available=bool(
+            variant.get(
+                "available",
+                False,
+            )
+        ),
+        url=product_url,
+        shop_discounted=shop_discounted,
+    )
 
+
+# ---------------------------------------------------------------------------
+# HTML-Shops: FPV24 / Rotorama / RCTech / HobbyDrone
+# ---------------------------------------------------------------------------
 
 def extract_price_near_heading(
     soup: BeautifulSoup,
     *,
-    limit: int = 120,
+    limit: int = 140,
 ) -> Decimal | None:
     heading = soup.find("h1")
 
@@ -292,7 +644,9 @@ def extract_price_near_heading(
         string=True,
         limit=limit,
     ):
-        text = " ".join(str(node).split())
+        text = " ".join(
+            str(node).split()
+        )
 
         if not text:
             continue
@@ -305,11 +659,13 @@ def extract_price_near_heading(
     return None
 
 
-def extract_fpv24_price(
+def extract_html_price(
     soup: BeautifulSoup,
     config: dict,
 ) -> Decimal:
-    price = extract_price_near_heading(soup)
+    price = extract_price_near_heading(
+        soup
+    )
 
     if price is not None:
         return price
@@ -324,238 +680,109 @@ def extract_fpv24_price(
         ".product-price",
         ".article-price",
         ".product-detail-price",
+        ".price",
     ]
 
     for selector in selectors:
         for node in soup.select(selector):
-            values = [
+            for raw_value in (
                 node.get("content"),
                 node.get("data-price"),
-                node.get_text(" ", strip=True),
-            ]
-
-            for raw_value in values:
+                node.get_text(
+                    " ",
+                    strip=True,
+                ),
+            ):
                 if not raw_value:
                     continue
 
-                price = parse_euro_price(raw_value)
+                price = parse_euro_price(
+                    raw_value
+                )
 
                 if price is not None:
                     return price
 
-    page_text = soup.get_text(" ", strip=True)
+    page_text = soup.get_text(
+        " ",
+        strip=True,
+    )
 
-    for product_name in (
-        config.get("name", ""),
-        config.get("short_name", ""),
-    ):
-        if not product_name:
-            continue
-
-        position = page_text.lower().find(
-            product_name.lower()
+    position = (
+        page_text
+        .lower()
+        .find(
+            config["short_name"]
+            .lower()
         )
+    )
 
-        if position == -1:
-            continue
-
+    if position != -1:
         price = parse_euro_price(
-            page_text[position:position + 2500]
+            page_text[
+                position:
+                position + 2800
+            ]
         )
 
         if price is not None:
             return price
 
     raise RuntimeError(
-        "FPV24-Preis konnte nicht erkannt werden."
+        "Preis konnte nicht erkannt werden."
     )
 
 
-def extract_fpv24_availability(
+def extract_html_availability(
     soup: BeautifulSoup,
 ) -> bool:
     heading = soup.find("h1")
 
     if heading is not None:
-        parts = [
-            " ".join(str(node).split())
-            for node in heading.find_all_next(
-                string=True,
-                limit=100,
+        parts = []
+
+        for node in heading.find_all_next(
+            string=True,
+            limit=160,
+        ):
+            text = " ".join(
+                str(node).split()
             )
-        ]
+
+            if text:
+                parts.append(text)
+
         local_text = normalize(
-            " ".join(part for part in parts if part)
+            " ".join(parts)
         )
     else:
         local_text = normalize(
-            soup.get_text(" ", strip=True)[:5000]
+            soup.get_text(
+                " ",
+                strip=True,
+            )[:7000]
         )
 
-    unavailable_markers = [
-        "vorbestellung",
-        "vorbestellen",
-        "wieder lieferbar",
-        "nicht lieferbar",
-        "nicht verfügbar",
-        "nicht verfuegbar",
-        "ausverkauft",
-        "benachrichtigen",
-    ]
-
-    if any(
-        marker in local_text
-        for marker in unavailable_markers
-    ):
-        return False
-
-    available_markers = [
-        "sofort lieferbar",
-        "auf lager",
-        "lagernd",
-        "sofort versandfertig",
-        "in den warenkorb",
-    ]
-
-    return any(
-        marker in local_text
-        for marker in available_markers
-    )
-
-
-async def fetch_fpv24_product(
-    client: httpx.AsyncClient,
-    config: dict,
-) -> dict:
-    response = await client.get(
-        config["url"],
-        headers={
-            "Referer": "https://www.fpv24.com/",
-            "Accept": (
-                "text/html,application/xhtml+xml,"
-                "application/xml;q=0.9,*/*;q=0.8"
-            ),
-            "Accept-Language": (
-                "de-DE,de;q=0.9,en;q=0.7"
-            ),
-        },
-    )
-    response.raise_for_status()
-
-    soup = BeautifulSoup(
-        response.text,
-        "html.parser",
-    )
-
-    price = extract_fpv24_price(
-        soup,
-        config,
-    )
-
-    available = extract_fpv24_availability(
-        soup
-    )
-
-    return {
-        "key": config["key"],
-        "name": config["name"],
-        "variant": config["variant"],
-        "price": f"{price:.2f}",
-        "currency": "EUR",
-        "available": available,
-        "url": config["url"],
-        "shop_discounted": False,
-    }
-
-
-def extract_rotorama_price(
-    soup: BeautifulSoup,
-    config: dict,
-) -> Decimal:
-    price = extract_price_near_heading(
-        soup,
-        limit=100,
-    )
-
-    if price is not None:
-        return price
-
-    selectors = [
-        'meta[itemprop="price"]',
-        'meta[property="product:price:amount"]',
-        '[itemprop="price"]',
-        '[data-price]',
-        ".price",
-        ".product-price",
-    ]
-
-    for selector in selectors:
-        for node in soup.select(selector):
-            values = [
-                node.get("content"),
-                node.get("data-price"),
-                node.get_text(" ", strip=True),
-            ]
-
-            for raw_value in values:
-                if not raw_value:
-                    continue
-
-                price = parse_euro_price(raw_value)
-
-                if price is not None:
-                    return price
-
-    page_text = soup.get_text(" ", strip=True)
-    product_name = config.get("name", "")
-
-    if product_name:
-        position = page_text.lower().find(
-            product_name.lower()
-        )
-
-        if position != -1:
-            price = parse_euro_price(
-                page_text[position:position + 2000]
-            )
-
-            if price is not None:
-                return price
-
-    raise RuntimeError(
-        "Rotorama-Preis konnte nicht erkannt werden."
-    )
-
-
-def extract_rotorama_availability(
-    soup: BeautifulSoup,
-) -> bool:
-    heading = soup.find("h1")
-
-    if heading is not None:
-        parts = [
-            " ".join(str(node).split())
-            for node in heading.find_all_next(
-                string=True,
-                limit=100,
-            )
-        ]
-        local_text = normalize(
-            " ".join(part for part in parts if part)
-        )
-    else:
-        local_text = normalize(
-            soup.get_text(" ", strip=True)[:5000]
-        )
-
+    # Immer zuerst negative Marker prüfen.
     unavailable_markers = [
         "auf dem weg",
         "verfügbarkeit überwachen",
         "verfuegbarkeit ueberwachen",
+        "artikel vergriffen",
+        "momentan nicht verfügbar",
+        "momentan nicht verfuegbar",
+        "derzeit nicht verfügbar",
+        "derzeit nicht verfuegbar",
+        "ausverkauft",
+        "vorbestellung",
+        "vorbestellen",
+        "wieder lieferbar",
+        "nicht lieferbar",
         "nicht auf lager",
         "nicht verfügbar",
         "nicht verfuegbar",
-        "ausverkauft",
+        "benachrichtigen, wenn verfügbar",
+        "benachrichtigen, wenn verfuegbar",
     ]
 
     if any(
@@ -568,6 +795,7 @@ def extract_rotorama_availability(
         "auf lager",
         "sofort verfügbar",
         "sofort verfuegbar",
+        "sofort lieferbar",
         "lagernd",
         "vorrätig",
         "vorraetig",
@@ -580,23 +808,30 @@ def extract_rotorama_availability(
     )
 
 
-async def fetch_rotorama_product(
+async def fetch_html_product(
     client: httpx.AsyncClient,
     config: dict,
 ) -> dict:
     response = await client.get(
         config["url"],
         headers={
-            "Referer": "https://www.rotorama.de/",
+            "Referer": config.get(
+                "referer",
+                config["url"],
+            ),
             "Accept": (
-                "text/html,application/xhtml+xml,"
-                "application/xml;q=0.9,*/*;q=0.8"
+                "text/html,"
+                "application/xhtml+xml,"
+                "application/xml;q=0.9,"
+                "*/*;q=0.8"
             ),
             "Accept-Language": (
-                "de-DE,de;q=0.9,en;q=0.7"
+                "de-DE,de;q=0.9,"
+                "en;q=0.7"
             ),
         },
     )
+
     response.raise_for_status()
 
     soup = BeautifulSoup(
@@ -604,32 +839,37 @@ async def fetch_rotorama_product(
         "html.parser",
     )
 
-    price = extract_rotorama_price(
+    price = extract_html_price(
         soup,
         config,
     )
 
-    available = extract_rotorama_availability(
-        soup
+    available = (
+        extract_html_availability(
+            soup
+        )
     )
 
-    return {
-        "key": config["key"],
-        "name": config["name"],
-        "variant": config["variant"],
-        "price": f"{price:.2f}",
-        "currency": "EUR",
-        "available": available,
-        "url": config["url"],
-        "shop_discounted": False,
-    }
+    variant = (
+        f"{config['receiver']} · "
+        f"{'GPS' if config['gps'] else 'ohne GPS'}"
+    )
 
+    return base_result(
+        config,
+        variant=variant,
+        price=price,
+        currency="EUR",
+        available=available,
+        url=config["url"],
+    )
+
+
+# ---------------------------------------------------------------------------
+# CSV
+# ---------------------------------------------------------------------------
 
 def ensure_csv_schema() -> None:
-    """
-    Migriert bestehende prices.csv-Dateien automatisch um neue Spalten.
-    Alte Historie bleibt erhalten.
-    """
     if not DATA_FILE.exists():
         return
 
@@ -660,21 +900,79 @@ def ensure_csv_schema() -> None:
             fieldnames=CSV_FIELDS,
             extrasaction="ignore",
         )
+
         writer.writeheader()
 
         for row in rows:
+            old_key = row.get(
+                "key",
+                "",
+            )
+
+            mapped_key = (
+                LEGACY_KEY_MAP.get(
+                    old_key,
+                    old_key,
+                )
+            )
+
+            config = PRODUCT_BY_KEY.get(
+                mapped_key,
+                {},
+            )
+
+            row["key"] = mapped_key
+            row.setdefault(
+                "family",
+                config.get(
+                    "family",
+                    "",
+                ),
+            )
+            row.setdefault(
+                "receiver",
+                config.get(
+                    "receiver",
+                    "",
+                ),
+            )
+            row.setdefault(
+                "gps",
+                str(
+                    bool(
+                        config.get(
+                            "gps",
+                            False,
+                        )
+                    )
+                ).lower(),
+            )
             row.setdefault(
                 "shop_discounted",
                 "false",
             )
+            row.setdefault(
+                "shipping_cost",
+                "",
+            )
+            row.setdefault(
+                "shipping_note",
+                "",
+            )
+
             writer.writerow(
                 {
-                    field: row.get(field, "")
+                    field: row.get(
+                        field,
+                        "",
+                    )
                     for field in CSV_FIELDS
                 }
             )
 
-    temp_file.replace(DATA_FILE)
+    temp_file.replace(
+        DATA_FILE
+    )
 
 
 def append_csv_rows(
@@ -686,7 +984,10 @@ def append_csv_rows(
     )
 
     ensure_csv_schema()
-    new_file = not DATA_FILE.exists()
+
+    new_file = (
+        not DATA_FILE.exists()
+    )
 
     with DATA_FILE.open(
         "a",
@@ -722,18 +1023,70 @@ def read_csv_rows() -> list[dict]:
                 row["price"] = float(
                     row["price"]
                 )
-            except (TypeError, ValueError):
+            except (
+                TypeError,
+                ValueError,
+            ):
                 continue
 
-            old_key = row.get("key", "")
-            row["key"] = LEGACY_KEY_MAP.get(
-                old_key,
-                old_key,
+            old_key = row.get(
+                "key",
+                "",
             )
+
+            row["key"] = (
+                LEGACY_KEY_MAP.get(
+                    old_key,
+                    old_key,
+                )
+            )
+
+            config = PRODUCT_BY_KEY.get(
+                row["key"],
+                {},
+            )
+
+            row["family"] = (
+                row.get("family")
+                or config.get(
+                    "family",
+                    "",
+                )
+            )
+
+            row["receiver"] = (
+                row.get("receiver")
+                or config.get(
+                    "receiver",
+                    "",
+                )
+            )
+
+            gps_raw = row.get(
+                "gps",
+                "",
+            )
+
+            if gps_raw == "":
+                row["gps"] = bool(
+                    config.get(
+                        "gps",
+                        False,
+                    )
+                )
+            else:
+                row["gps"] = (
+                    str(gps_raw)
+                    .lower()
+                    == "true"
+                )
 
             row["available"] = (
                 str(
-                    row.get("available", "")
+                    row.get(
+                        "available",
+                        "",
+                    )
                 ).lower()
                 == "true"
             )
@@ -748,21 +1101,47 @@ def read_csv_rows() -> list[dict]:
                 == "true"
             )
 
+            shipping_raw = row.get(
+                "shipping_cost",
+                "",
+            )
+
+            try:
+                row["shipping_cost"] = (
+                    float(shipping_raw)
+                    if shipping_raw
+                    not in (None, "")
+                    else None
+                )
+            except (
+                TypeError,
+                ValueError,
+            ):
+                row["shipping_cost"] = None
+
+            row["shipping_note"] = str(
+                row.get(
+                    "shipping_note",
+                    "",
+                )
+            )
+
             rows.append(row)
 
     return rows
 
 
+# ---------------------------------------------------------------------------
+# Preisabruf
+# ---------------------------------------------------------------------------
+
 async def collect_prices() -> dict:
-    """
-    Ruft alle Produkte ab und speichert den aktuellen Shoppreis.
-    Bei iFlight wird separat gespeichert, ob der Shoppreis bereits
-    rabattiert ist.
-    """
     async with scrape_lock:
         timestamp = datetime.now(
             TIMEZONE
-        ).isoformat(timespec="seconds")
+        ).isoformat(
+            timespec="seconds"
+        )
 
         collected = []
         errors = {}
@@ -776,11 +1155,14 @@ async def collect_prices() -> dict:
                 "Chrome/140.0 Safari/537.36"
             ),
             "Accept": (
-                "text/html,application/xhtml+xml,"
-                "application/json;q=0.9,*/*;q=0.8"
+                "text/html,"
+                "application/xhtml+xml,"
+                "application/json;q=0.9,"
+                "*/*;q=0.8"
             ),
             "Accept-Language": (
-                "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7"
+                "de-DE,de;q=0.9,"
+                "en-US;q=0.8,en;q=0.7"
             ),
         }
 
@@ -817,57 +1199,78 @@ async def collect_prices() -> dict:
                 print(
                     "[WARNUNG] "
                     "iFlight-Währung konnte nicht "
-                    f"bestimmt werden: {exc}. Nutze EUR."
+                    f"bestimmt werden: {exc}. "
+                    "Nutze EUR."
                 )
 
             for config in PRODUCTS:
                 try:
-                    source = config["source"]
+                    if (
+                        config["source"]
+                        == "iflight_shopify"
+                    ):
+                        result = (
+                            await fetch_iflight_product(
+                                client,
+                                config,
+                                iflight_currency,
+                            )
+                        )
 
-                    if source == "iflight_shopify":
-                        result = await fetch_iflight_product(
-                            client,
-                            config,
-                            iflight_currency,
+                    elif (
+                        config["source"]
+                        == "html"
+                    ):
+                        result = (
+                            await fetch_html_product(
+                                client,
+                                config,
+                            )
                         )
-                    elif source == "fpv24_html":
-                        result = await fetch_fpv24_product(
-                            client,
-                            config,
-                        )
-                    elif source == "rotorama_html":
-                        result = await fetch_rotorama_product(
-                            client,
-                            config,
-                        )
+
                     else:
                         raise RuntimeError(
-                            f"Unbekannte Quelle: {source}"
+                            "Unbekannte Quelle: "
+                            f"{config['source']}"
                         )
 
-                    result["timestamp"] = timestamp
-                    collected.append(result)
+                    result["timestamp"] = (
+                        timestamp
+                    )
+
+                    collected.append(
+                        result
+                    )
 
                     print(
                         f"[{timestamp}] "
-                        f"{result['name']} -> "
+                        f"{result['name']} "
+                        f"@ {config['shop']} -> "
                         f"{result['price']} "
-                        f"{result['currency']} "
-                        f"({result['variant']})"
+                        f"{result['currency']}"
                     )
 
                 except Exception as exc:
-                    errors[config["key"]] = str(exc)
+                    errors[
+                        config["key"]
+                    ] = str(exc)
+
                     print(
                         "[FEHLER] "
-                        f"{config['name']}: {exc}"
+                        f"{config['name']} "
+                        f"@ {config['shop']}: "
+                        f"{exc}"
                     )
 
         if collected:
             async with file_lock:
-                append_csv_rows(collected)
+                append_csv_rows(
+                    collected
+                )
 
-            state["last_success"] = timestamp
+            state["last_success"] = (
+                timestamp
+            )
 
         state["last_run"] = timestamp
         state["last_errors"] = errors
@@ -885,7 +1288,9 @@ scheduler = AsyncIOScheduler(
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(
+    app: FastAPI,
+):
     scheduler.add_job(
         collect_prices,
         trigger="interval",
@@ -905,17 +1310,22 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    scheduler.shutdown(wait=False)
+    scheduler.shutdown(
+        wait=False
+    )
 
 
 app = FastAPI(
     title="drone-scraper",
-    version="0.3.0",
+    version="0.5.0",
     lifespan=lifespan,
 )
 
 
-@app.get("/", include_in_schema=False)
+@app.get(
+    "/",
+    include_in_schema=False,
+)
 async def index():
     if not INDEX_FILE.exists():
         return {
@@ -925,7 +1335,9 @@ async def index():
             )
         }
 
-    return FileResponse(INDEX_FILE)
+    return FileResponse(
+        INDEX_FILE
+    )
 
 
 @app.get("/api/prices")
@@ -937,15 +1349,28 @@ async def api_prices():
 @app.get("/api/status")
 async def api_status():
     return {
-        "last_run": state["last_run"],
-        "last_success": state["last_success"],
-        "last_errors": state["last_errors"],
+        "last_run": state[
+            "last_run"
+        ],
+        "last_success": state[
+            "last_success"
+        ],
+        "last_errors": state[
+            "last_errors"
+        ],
         "products": [
             {
                 "key": product["key"],
+                "family": product["family"],
                 "name": product["name"],
-                "short_name": product["short_name"],
+                "short_name": product[
+                    "short_name"
+                ],
                 "shop": product["shop"],
+                "receiver": product[
+                    "receiver"
+                ],
+                "gps": product["gps"],
                 "url": (
                     product["url"]
                     if "url" in product
@@ -959,6 +1384,14 @@ async def api_status():
                         "new_account_discount_percent",
                         0,
                     )
+                ),
+                "shipping_mode": product.get(
+                    "shipping_mode",
+                    "checkout",
+                ),
+                "shipping_label": product.get(
+                    "shipping_label",
+                    "",
                 ),
             }
             for product in PRODUCTS
